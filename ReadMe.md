@@ -1,270 +1,135 @@
-# Hydrogen Subnet: Building the Representation Layer for Physical Intelligence  
-*A Decentralized Marketplace for Verified Physics Intelligence on Bittensor*  
+# Hydrogen: The Self-Improving Physics Engine
+
+*A Bittensor subnet turning the sim-to-real gap into a compounding knowledge economy.*
 
 ---
 
-## The Thesis: Why Physics Needs a Representation Layer  
+## The Blade That Melted
 
-> *"Every durable market begins with a better model of the world."*  
-> — Meltem Demirors, Crucible Capital  
+2019. A major aerospace company. Six months training a neural operator to predict thermal stress in turbine blades. Two percent test error. Three weeks in production, a blade melted in testing.
 
-Today, engineering simulation is broken:  
-- **Slow**: A single high-fidelity CFD/FEA simulation takes hours or days.  
-- **Expensive**: Requires specialized HPC clusters and expert operators.  
-- **Untrustworthy**: Surrogates often fit training data but violate physics (e.g., creating energy from nowhere), leading to costly field failures.  
-- **Siloed**: Knowledge doesn’t transfer between problems, teams, or industries.  
+The surrogate hadn't learned physics. It had learned to minimize MSE. Energy conservation drifted 0.3% in a regime they hadn't tested. In the real world, 0.3% energy drift means a blade melts.
 
-Yet the demand for faster, more reliable simulation is exploding:  
-- Digital twins for manufacturing, energy grids, and infrastructure  
-- Real-time optimization of power grids and supply chains  
-- Accelerated R&D in aerospace, automotive, and pharmaceuticals  
-- Uncertainty quantification for climate modeling and risk assessment  
+This isn't isolated. A fusion lab's neural operator predicted plasma stability perfectly—until it didn't. A semiconductor firm's layout optimizer passed every regression test—until a new geometry violated divergence-free. The sim-to-real gap isn't an accuracy problem.
 
-**The core insight**: Just as high-frequency trading firms built proprietary representations of market microstructure to gain structural advantages, we can build a **decentralized representation layer for the physical world**—where every verified improvement in physics simulation becomes a tradable commodity that compounds into lasting engineering value.  
-
-This is Hydrogen: a Bittensor subnet that turns the "sim-to-real gap" from a frustrating limitation into a self-improving market for physical intelligence.  
+**It's a trust problem.**
 
 ---
 
-## How Hydrogen Works: The Knowledge Flywheel  
+## The Technology That Almost Changed Everything
 
-Hydrogen operates as a self-improving system where three specialized layers create compounding value:  
+Neural operators (FNO, PINO, DeepONet, GNO, OFormer) are the most important breakthrough in computational science in two decades.
 
-### 1. The Miner: Innovating on Training Strategy (Zero Compute Burden)  
-Miners **do not upload models or code**. Instead, they submit lightweight **training strategy JSONs** (≈1KB) describing *how* to train a surrogate:  
-```jsonc  
-{  
-  "backbone": "FNO",  
-  "resolution": [128, 128],  
-  "fno": { "fourier_modes": [16, 16] },  
-  "pino": { "pino_loss_weight": 1.8 },  
-  "physics_informed": true,  
-  "curriculum_learning": { "enabled": true }  
-}  
-```  
-- **Why this works**: Miners innovate on *what matters most* for physics fidelity (e.g., increasing Fourier modes to capture turbulence spectra, weighting physics loss to enforce conservation laws).  
-- **Burden near-zero**: Editable on a laptop; no training, no model uploads, no heavy dependencies.  
-- **Fee**: 0.1 TAO submission (covers validator cost; prevents spam).  
+Traditional simulation discretizes physics onto meshes and solves linear systems—O(N³) scaling. For 3D turbulence at real Reynolds numbers, you need exascale machines and weeks of compute.
 
-### 2. The Validator: Trustworthy, Physics-Aware Scoring  
-Validators execute **deterministic, physics-validated scoring** using pre-built backend images:  
-1. Pull a pinned Docker image (FNO, PINO, DeepONet, etc., with PhysicsNeMo + NeuralOperator).  
-2. Train the surrogate using the miner’s strategy on public benchmark data.  
-3. **Score improvement** vs. the current baseline on a public hold-out set.  
-4. **Run a hidden stress test** (algorithmically varied per challenge ID) that includes **hard physics checks**:  
-   - ❌ *Hard rejection* if mass conservation error > 1e-3 (`‖∇·u‖₁`)  
-   - ❌ *Hard rejection* if energy dissipation rate > 1e-4 (`dE/dt > 0` should be ≤0 for dissipative systems)  
-   - ⚠️ *Soft penalty* if symmetry error > 0.05 (`‖u - u_flipped‖₂ / ‖u‖₂`)  
-5. **Final score** = `[max(0, improvement)] × 1.20` **only if all hard checks pass** (else score = 0).  
-- **Why this works**:  
-  - Scores reflect **verified physical improvement**—not just curve fitting.  
-  - Hidden stress test prevents overfitting; hard physics checks eliminate physically nonsensical surrogates.  
-  - Validator work is predictable and parallelizable (~5-10 min/submission on RTX 3060).  
+Neural operators learn the **solution operator itself**: the mapping from forcing, initial conditions, material properties → solution field. Inference is a forward pass. Milliseconds on a GPU. Cost amortized over infinite queries.
 
-### 3. The Landscape: Compounding Intelligence (Agent/Team Managed)  
-All miner submissions (winning and losing) feed a shared **knowledge landscape** that distills strategies into better baselines, reusable specialists, and eventually a foundation neural operator:  
+The real breakthrough: **discretization invariance**. Following the Berner et al. recipe, a properly constructed neural operator learns a mapping between *function spaces*, not vectors. Train on 64², evaluate on 256²—it works because the architecture respects the continuous operators underneath. This enables zero-shot super-resolution, multi-scale modeling, geometry transfer.
 
-```mermaid  
-graph LR  
-    A[Miner Submits Strategy JSON] --> B{Validator Scores It}  
-    B -->|Passes Physics Checks| C[Certified Strategy Fragment]  
-    B -->|Fails Physics Checks| D[Diagnostic Fragment - Learning Signal]  
-    C --> E[Landscape Agent Analyzes Fragment]  
-    D --> E  
-    E --> F[Discovers Effective Physics Patterns<br>e.g., physics_invalid=true → +0.11 improvement]  
-    F --> G[Landscape Proposes Improved Baseline JSON<br>e.g., default physics_invalid_weight = 1.5]  
-    G --> H[Owner/Team Approves Baseline]  
-    H --> I[Next Challenge: All Miners Start from Better Baseline]  
-    I --> J[Higher Quality Submissions → More Certified Fragments]  
-    J --> E  
-    E --> K[Landscape Distills Fragments → Specialists<br>ONNX/TensorRT modules with physics competency_domains]  
-    K --> L[Specialists Deployed in Mining/Validation<br>→ Faster Convergence/Better Scores]  
-    L --> J  
-    E --> M[Landscape Detects Gaps → Exploration Challenges<br>With bonus emissions for underexplored regimes]  
-    M --> N[Miners Submit Targeted Strategies → New High-Value Fragments]  
-    N --> E  
-```  
+The theory is solid (Berner et al., Nature 2026). The implementations are production-ready (PhysicsNeMo, NeuralOperator). But they have a fatal flaw: **they optimize for loss functions, not physics.**
 
-**Key knowledge outputs**:  
-- **Improved Baseline JSON**: Updated post-challenge (e.g., raise default `fourier_modes` to `[16,16]`, set `physics_invalid=true`).  
-- **Specialist Bank**: ONNX/TensorRT modules distilled from winning strategies, tagged with:  
-  - `competency_domains` (e.g., `["navier_stokes/re>5000", "mass_conservation: true"]`)  
-  - `known_failure_modes` (e.g., `["mass_nonconservation"]` from fragment evidence)  
-  - `reuse_count` (real-world utility → drives retroactive rewards)  
-- **Exploration Challenges**: Landscape agent identifies underexposed physics regimes (e.g., high-Reynolds NS) and triggers bonus-emission challenges.  
+A surrogate trained on MSE minimizes MSE. It doesn't know ∇·u = 0 is a law, not a suggestion. It doesn't know energy dissipation is a constraint, not a penalty. It doesn't know shocks must satisfy Rankine-Hugoniot. And because training distributions never cover deployment space, violations appear exactly where they hurt most: the extrapolation regime, the edge case, the novel design.
 
 ---
 
-## Why This Works: Aligned Incentives & Physics Rigor  
+## Starting on Solid Ground
 
-### ✅ For Miners Win-Win Incentive Structure  
-| Actor | Incentive | How It’s Paid |  
-|-------|-----------|---------------|  
-| **Miner** | Earn emissions for **verified physical improvement** | Rank-based payout (40%/30%/20%/10% of miner emissions) based on final score |  
-| **Landscape Agent** | Funded by team | Pays for analysis, baseline updates, specialist distillation |  
-| **Validator** | Covered by **0.1 TAO submission fee** | Cost ≈ 0.04–0.07 TAO/submission (well under fee) |  
-| **Owner/Team** | **18% of emissions** + **IP licensing revenue** | Funds BD, legal, and strategic growth |  
+We are not building neural operators from scratch. We are building on two mature, production-grade foundations:
 
-### ✅ Anti-Gaming & Physics Trust  
-- **No model uploads**: Eliminates weight fabrication and overfitting to public benchmarks.  
-- **Hard physics gates**: Score = 0 if mass/energy conservation fails—*no credit for physically invalid surrogates*.  
-- **Knowledge compounding**: Landscape learns *which strategies improve physical fidelity* (e.g., `"pino_loss_weight=1.8 → mass conservation error ↓ 75%"`), not just statistical correlations.  
-- **Custom data incentives**: Miners paid only for data that *reduces physics error* (measured via impact on winning strategies).  
+**PhysicsNeMo** (NVIDIA) provides the reference implementations: FNO, PINO, DeepONet, GNO, OFormer with built-in physics-informed losses, conservation constraints, spectral layers, boundary handling, and UQ tooling. It is the PyTorch of physics-informed neural operators—battle-tested in industrial deployments from climate modeling to semiconductor design.
 
-### ✅ Buildability & Scalability  
-- **Phase 0 launchable in <4 weeks**:  
-  - Uses existing PhysicsNeMo/NeuralOperator tooling (no new ML research needed).  
-  - Validator images: 5 pinned Docker images (FNO, PINO, DeepONet, GNO, OFormer).  
-  - Miner workload: Editing a JSON file (laptop/phone capable).  
-  - Validator workload: ~5-10 min/submission on RTX 3060 (parallelizable).  
-- **Physics-first design**:  
-  - Benchmarks target foundational physics domains (Poisson, Darcy, NS vorticity, elasticity).  
-  - Stress tests probe *physical* failure modes (mass conservation, energy dissipation, symmetry).  
-  - Landscape agent learns physics-relevant levers (e.g., `"Raise pino_loss_weight to fix mass conservation in Darcy"`).  
+**NeuralOperator** (the library behind the Berner et al. Nature paper) provides the mathematical backbone: the layer conversions that make standard architectures discretization-agnostic, the quadrature weights that preserve conservation, the spectral and graph operator implementations. It is the reference implementation of the theory.
+
+Hydrogen wraps these libraries in pinned, versioned Docker images. Validators pull `hydrogen/validator:pino-v24.09` and get exactly the same PhysicsNeMo + NeuralOperator + PyTorch + CUDA stack every time. Miners never install dependencies. They only tune the knobs these libraries already expose.
+
+We are not inventing the engine. We are building the **race track, the timing system, and the engineering team that learns from every lap.**
 
 ---
 
-## Roadmap: From Strategy Submission to Foundation Model  
+## The Mechanism
 
-### Phase 0: Foundation (Weeks 1-6)  
-**Goal**: Prove the knowledge flywheel works on foundational physics.  
-- **Challenges**: 2D Poisson, 2D Darcy flow, 2D NS vorticity, 2D linear elasticity (all from PhysicsNeMo/NeuralOperator).  
-- **Miner innovation**: Strategy JSON only (backbone choice, loss weights, optimizer, scheduler, physics flags, curriculum).  
-- **Landscape agent**:  
-  - Stores all strategy fragments in SQLite.  
-  - Weekly correlation job: Discovers physics-relevant patterns (e.g., `pino_loss_weight=1.8 → mass conservation error ↓ 75% in Darcy`).  
-  - Proposes baseline JSON updates (e.g., raise default `pino_loss_weight`).  
-- **Success metric**: Median miner improvement score > 0.05 vs. genesis baseline after 20 challenges.  
-- **Outcome**: A self-improving baseline where miners start from better starting points each cycle.  
+**Open challenges.** At any time, a set of challenges is open for competition. Each challenge defines a PDE problem—Poisson, Darcy, Burgers, Navier-Stokes, Heat, Elasticity, Thermo-elasticity—in 2D or 3D, with a public training split, a public holdout set, and a **hidden stress test** generated procedurally from the challenge ID (shifted Reynolds numbers, resolutions, geometries, forcing). No miner has ever seen the stress test.
 
-### Phase 1: Adapter Innovations & Custom Data (Weeks 7-16)  
-**Goal**: Let miners express finer improvements; reward high-quality data.  
-- **New miner affordances**:  
-  - **Adapter block** (≈1KB): e.g., LoRA rank=4 on `fno_layers.0.spectral_conv` to tweak a winning backbone without full retraining.  
-  - **Enhanced custom data**: Miners submit high-fidelity simulations/curricula; paid via data-royalty pool (5% of emissions) for *measured impact* on physics error.  
-- **Landscape agent**:  
-  - Tracks adapter/custom data impact on physics errors (e.g., `"LoRA rank=4 → energy dissipation ↓ 0.0002"`).  
-  - Proposes baseline updates (e.g., enable curriculum by default for transient problems).  
-- **Success metric**: Median improvement score increases ≥0.03 vs. Phase 0 baseline after 4 weeks.  
+**Miners submit strategy JSONs.** A strategy specifies: backbone choice (FNO, PINO, DeepONet, GNO, OFormer), a **loss vector** with per-physics-term weights (pde_residual, conservation, boundary, symmetry, coupling), optimizer, curriculum schedule, UQ method (deep ensemble, conformal, evidential). They pay 0.1 TAO. They never touch a GPU. They never upload weights.
 
-### Phase 2: Specialist Marketplace (Weeks 17-28)  
-**Goal**: Turn winning strategies into ready-to-use, reusable surrogates.  
-- **New miner affordances**:  
-  - **Specialist selection**: Submit `{"specialist_id": "pino_darcy_v3", "adapter": {...}}` to pick/refine an existing specialist.  
-  - **Specialist bank**: Pre-built ONNX/TensorRT specialists (e.g., a Darcy specialist that conserves mass) stored in the landscape.  
-  - Validator load: Near-zero for selection (load specialist → run inference); low for improvement (train adapter weights only).  
-- **Landscape agent**:  
-  - Distills top strategies into specialists (validated against physics checks).  
-  - Runs multi-teacher distillation across the specialist bank to produce a **foundation neural operator**.  
-- **Success metric**: Specialist bank contains ≥20–30 high-quality specialists; foundation operator outperforms best individual specialist on mixed validation set.  
+**Validators run the training.** They pull the pinned backbone image, inject the miner's JSON, train on the public training split, evaluate on the public holdout, then run the hidden stress test through **hard physics gates**:
+- Mass conservation: ‖∇·u‖₁ < 1e-3
+- Energy dissipation: dE/dt ≤ 1e-4
+- Boundary satisfaction
+- Rollout stability over 100 steps
+- UQ calibration: 90% prediction intervals must cover truth 90% of the time (±2%)
 
-### Phase 3+: Foundation Model & Agent-Driven Discovery (Month 7+)  
-**Goal**: Provide a general-purpose physics-informed neural operator for fine-tuning; let SAGE agent drive discovery.  
-- **New miner affordances**:  
-  - **Foundation model fine-tuner**: Submit minimal strategy JSON + custom data blob; validator fine-tunes foundation model for few epochs.  
-  - **SAGE-agent collaborator**: Propose new architectures/loss terms (e.g., `"Adding deformable Fourier-mode block improves 3D NS turbulence spectra"`).  
-- **Landscape agent (SAGE-Style)**:  
-  - Runs lightweight experiments to test hypotheses.  
-  - Issues custom-data bounties (e.g., `"Collect high-Reynolds NS snapshots in Re=500–2000"`).  
-  - Updates foundation model based on validated hypotheses.  
-- **Success metric**: Sustainable revenue from foundation model licensing/API usage covers >50% of miner rewards.  
+Hard failure = score zero. No bonuses. No partial credit. Physics is binary.
+
+**Score = log(E_baseline) - log(E_submission).** Improvement measured in log-space against the current baseline. Median of five validators determines the winner. Winner takes the 41% emission share.
+
+**Every submission becomes a StrategyFragment.** The config, the score, the stress result, UQ metrics, and its lineage in the fragment DAG. Winning or losing—every fragment teaches the Landscape.
 
 ---
 
-## Investment thesis: Why Hydrogen Creates Real Engineering Value  
+## The Landscape Agent
 
-### The Core Value Proposition  
-Hydrogen doesn’t just create another crypto token—it builds **actionable physics intelligence** that directly reduces the cost of innovation in engineering:  
+The Landscape doesn't just correlate. It runs **Double Machine Learning on the fragment DAG** to estimate `P(improvement | do(param))`—the *causal effect* of a config change, not the spurious correlation.
 
-| Engineering Pain Point | How Hydrogen Solves It | Economic Impact |  
-|------------------------|------------------------|-----------------|  
-| **Slow simulations** (hours/days per run) | Surrogates run in **milliseconds** on edge/cloud | 100–1000× faster design iterations → faster time-to-market |  
-| **Untrustworthy surrogates** (fit data but violate physics) | **Physics-validated surrogates** (hard conservation/energy checks in validator) | Eliminates costly field failures (e.g., buckling bridges, thermal runaway in batteries) |  
-| **Siloed knowledge** (no transfer between problems/teams) | **Knowledge landscape compounds improvements** → better baselines/specialists for all | Reduces R&D duplication; accelerates cross-domain innovation |  
-| **Expensive HPC reliance** | Surrogates run on **edge devices** (jets, factories, medical implants) | Enables real-time control and decentralized monitoring |  
+It discovers that Fourier modes 32 help *only when* physics loss > 1.0. That curriculum helps *only when* start resolution ≤ 0.5× end resolution. That ghost cells prevent boundary locking *only for* elasticity and NS, not Poisson.
 
-### The Path to Sustainable Revenue  
-While emission rewards drive early miner participation, long-term value comes from:  
-1. **Specialist Marketplace (Phase 2+)**:  
-   - Sell ONNX/TensorRT specialists under AGPL-3.0 (open) or commercial licenses (e.g., a "Darcy high-contrast permeability specialist" for reservoir engineers).  
-   - *Revenue model*: Per-download, per-API-call, or support subscriptions.  
-2. **Foundation Model Licensing (Phase 3+)**:  
-   - Offer the physics-foundation neural operator as a service:  
-     - **API access**: Pay-per-query for fine-tuned surrogates (e.g., `"What is the stress concentration for this notch geometry?"`).  
-     - **Model downloads**: Commercial licenses for on-premise deployment (e.g., in digital twin platforms).  
-   - *Revenue model*: Subscription tiers (free tier for academics; paid for enterprise SLAs).  
-3. **Data-Royalty Pool (Ongoing)**:  
-   - Miners paid for high-impact custom data (e.g., a high-Reynolds NS DNS dataset) proportional to its measured error reduction.  
-   - *Revenue model*: 5% of emissions allocated to data royalties—funded by the subnet’s emission rewards.  
+Every challenge cycle, it proposes a new baseline JSON incorporating the strongest causal effects. Every distillation cycle, it takes the top-K strategies and distills them into **ONNX specialists** via multi-teacher distillation—regression tested against the same stress tests—and publishes them to the Specialist Bank with validity domains and dual licensing (AGPL-3.0 + commercial).
 
-### Why This Beats Alternatives  
-| Approach | Fatal Flaw | How Hydrogen Avoids It |  
-|----------|------------|------------------------|  
-| **Pure compute marketplace** (e.g., rent FLOPs) | Rewards quantity, not quality; no knowledge compounding | Rewards *verified physics improvement*; knowledge compounds in landscape |  
-| **Model-upload subnet** (e.g., miners submit surrogates) | Validator can’t verify physics at scale; overfitting/rampant fraud | Strategy-only submission + hard physics checks = provable physical improvement |  
-| **Generic AI subnet** (e.g., text/image generation) | No tie to physical value; engineering users won’t adopt | Every innovation targets a *specific, verifiable physics problem* with engineering relevance |  
-| **Closed-door research consortium** | Slow, inaccessible, no economic incentives for global talent | Open, permissionless, and pays miners in TAO for real progress |  
+The Landscape is funded by the Owner's 18% emissions plus a time-locked treasury (10% of Owner emissions, 6-month cliff, 2-year vest, 3/5 multi-sig). The agent is replaceable; the causal knowledge graph is not.
 
 ---
 
-## Go-to-Market Strategy: From Subnet to Engineering Workflow  
+## Phases
 
-### Phase 0–1: Build Miner & Validator Base  
-- **Target miners**: Physics-informed ML researchers, HPC enthusiasts, academic labs (low barrier: edit JSON on laptop).  
-- **Target validators**: Universities, research labs, or professional node operators with RTX 3060+ GPUs.  
-- **Tactics**:  
-  - Partner with PhysicsNeMo/NeuralOperator communities for early miner adoption.  
-  - Provide pre-built validator images and miner CLI (one-click setup).  
-  - Launch with 2D Poisson challenge—quick to run, high signal-to-noise for early adoption.  
+**Phase 0: The Causal Baseline.** Strategy JSONs for 10 problems spanning the PDE taxonomy: Poisson 2D/3D (elliptic constant-coeff), Darcy 2D/3D (elliptic variable-coeff), Burgers (nonlinear advection/shocks), Navier-Stokes 2D/3D (incompressible flow, turbulence gateway), Heat with variable diffusivity (transient diffusion), Elasticity (vector output, tensor physics), Thermo-elasticity (multi-physics coupling with loss_vector). All have public train/holdout + hidden stress tests + PhysicsNeMo reference implementations. Landscape builds causal fragment DAG, proposes baseline updates. 3D problems run on 24GB GPUs with gradient checkpointing.
 
-### Phase 2: Specialist Marketplace Launch  
-- **Target users**: Engineering teams needing fast, trustworthy surrogates for specific problems (e.g., aerospace stress analysis, reservoir modeling).  
-- **Tactics**:  
-  - List specialists on a public marketplace (e.g., `hydrogen/pino_darcy_v3.onnx` with AGPL-3.0 license).  
-  - Integrate with popular tools:  
-    - **ANSYS/Fluent**: Add a "Hydrogen Specialist" button to load a pre-built surrogate.  
-    - **Simulink**: Create a block that calls the specialist API for real-time control.  
-    - **Python/scikit-learn**: Wrap specialists as sklearn-compatible estimators.  
-  - *Value prop*: "Get a physics-validated surrogate for your Darcy flow problem in 5 minutes—no training, no HPC, no PhD required."  
+**Phase 1: Adapters & Data Markets.** Miners submit LoRA adapters (tiny weight deltas) and custom datasets (high-fidelity DNS, curated permeability fields). Landscape pays data royalties for measured impact. First ONNX specialists distilled, dual-licensed (AGPL-3.0 + commercial).
 
-### Phase 3+: Foundation Model & Enterprise Sales  
-- **Target users**: Enterprises needing scalable, customizable physics simulation (OEMs, energy companies, medtech).  
-- **Tactics**:  
-  - Offer the foundation model as:  
-    - A **cloud API** (pay-per-surrogate-query) for occasional use.  
-    - An **on-premise license** (annual fee) for high-volume use (e.g., in digital twin platforms).  
-  - Partner with system integrators (e.g., Siemens, Dassault Systèmes) to embed Hydrogen surrogates in their simulation suites.  
-  - *Value prop*: "Replace your slow FEA solver with a Hydrogen-surrogate-accelerated workflow—get 100× more design iterations in the same time."  
+**Phase 2: Specialist Marketplace.** Miners select specialists by ID—zero training, instant inference. Specialist Bank becomes composable library. Multi-teacher distillation across the bank produces Foundation Operator v1. Commercial fine-tuning API launches (encrypted client data → TEE adaptation).
 
-### Early Adopter Incentives  
-- **Academics**: Free access to foundation model for research; co-author opportunities on knowledge compounding papers.  
-- **Early validators**: Bonus emissions for helping bootstrap the network (first 50 validators get 2× emissions for 3 months).  
-- **Pioneer miners**: NFTs for first 100 strategy submissions that improve baselines by >5% (redeemable for specialist marketplace access).  
+**Phase 3+: Foundation Operator.** Foundation Operator becomes core IP—one model conditioned on ProblemSignature, fine-tunable in minutes. SAGE agent proposes new architectures, loss terms, data bounties. Custom surrogate service: client submits encrypted geometry → verified, calibrated, physics-compliant specialist in minutes.
 
 ---
 
-## Downstream Implications of Success  
+## Design Choices
 
-If Hydrogen achieves its vision, the ripple effects transform how we engineer the physical world:  
+| We Chose... | Because... |
+|-------------|------------|
+| **Miners submit JSON strategies, not models** | Accessibility (laptop-only), verifiability (same code/data/seed), knowledge extraction (config = transferable insight), anti-gaming (no weight hiding) |
+| **Validators run pinned Docker images** | Determinism, PhysicsNeMo integration, predictable cost, upgradability |
+| **Procedural hidden stress tests + hard physics gates** | Static holdouts get overfit. Physics violations are binary—dangerous, not "99% correct." |
+| **Loss vector, not scalar** | Multi-physics needs per-term balance. Miners learn scaling laws. |
+| **Causal inference (DML) > correlation** | "Fourier modes help" only when physics loss > 1.0. DML estimates `P(improvement | do(param))` on the fragment DAG. |
+| **10 problems spanning the PDE taxonomy** | Cross-cutting principles only learnable with full coverage. |
+| **3D Navier-Stokes in Phase 0** | Highest-value surrogate class. 24GB GPUs are commodity; Landscape needs 3D scaling laws now. |
+| **Owner-funded Landscape + time-locked treasury** | Owner revenue comes from Landscape value, not skimming miners. Resilience guaranteed. |
 
-### 1. **Democratizing Physics Simulation**  
-- A student in Nairobi can run a turbine blade stress analysis on their laptop using a Hydrogen specialist—no $50k/workstation or ANSYS license needed.  
-- A startup in Jakarta can optimize battery thermal management using a foundation model fine-tuned on their specific cell chemistry—no HPC cluster required.  
+---
 
-### 2. **Accelerating Innovation Cycles**  
-- **Automotive**: Reduce CFD iterations for aerodynamics from weeks to hours → faster EV development.  
-- **MedTech**: Test 100× more stent designs in silico → fewer animal trials, faster FDA approval.  
-- **Energy**: Simulate 10,000+ CO₂ sequestration scenarios in a day → optimal site selection in weeks, not years.  
+## Staged Business Plan & Moat
 
-### 3. **New Business Models Emerge**  
-- **Simulation-as-a-Service (SaaS)**: Platforms like AWS/Azure offer "Hydrogen-accelerated physics" as a premium compute tier.  
-- **Insurance**: Dynamic premiums based on real-time structural health monitors powered by Hydrogen surrogates (e.g., bridge fatigue prediction).  
-- **Materials Science**: Reverse-engineer novel alloys by querying the foundation model: *"What microstructure yields this target strength/conductivity?"*  
+**The Asset:** The Landscape's causal knowledge graph—causally-validated interventions across 10 PDE families, growing every challenge cycle. This dataset does not exist anywhere. NVIDIA, ANSYS, Siemens pay seven figures for "training best practices" data.
 
-### 4. **The Ultimate Impact: A Physical World Representation Layer**  
-Just as the IP protocol enabled the internet, Hydrogen enables:  
-- **Trustworthy digital twins**: Simulations that engineers can bet lives and capital on.  
-- **Physics-aware AI**: Foundation models that understand governing equations—not just patterns.  
-- **Global collaboration**: A surgeon in Boston and a farmer in Nairobi using the same surrogate to optimize a medical implant or irrigation system—knowing it respects the same physics.  
+**The Moat:** Structural, not technical. Benchmarks are public. Backbones are PhysicsNeMo. The *causally-validated intervention effects* require the subnet's three-legged flywheel: miners explore for emissions, validators verify with physics gates for emissions, Landscape distills causal knowledge for Owner revenue.
 
-> **This is not just a subnet. It’s the first step toward a world where simulating the physical world is as cheap, fast, and reliable as simulating the digital world—and where every engineer, regardless of location or resources, can innovate at the speed of thought.**  
+**Staged Revenue:**
+- **Phase 0-1:** TAO emissions fund operations. Landscape builds asset.
+- **Phase 1-2:** Specialist licensing (AGPL-3.0 ecosystem + commercial dual-license). Data royalties from custom datasets.
+- **Phase 2-3:** Foundation Operator API (fine-tuning on encrypted client data in TEE). Custom surrogate service (encrypted geometry → verified specialist).
+- **Phase 3+:** Revenue > emissions. Emissions become "innovation bonus." Physics infrastructure layer.
+
+**Downside Protection:** TAO crash → validator costs covered by 0.1 TAO fee (scales); Owner treasury time-locked (6-month cliff, 2-year vest, 3/5 multi-sig). Miner exodus → fragments → specialists → Foundation Operator survives. Physics checks too hard → soft penalties + diagnostics keep miners iterating.
+
+---
+
+## Implications & Vision
+
+**For Computational Science:** The first continuous, adversarial, physics-gated benchmark in history. Tribal knowledge becomes public, versioned, auditable, *causal*. The sim-to-real gap becomes a measured, shrinking, attributable quantity.
+
+**For Engineering Practice:** Custom surrogates on demand. "I need a surrogate for my heat exchanger geometry." → Submit encrypted geometry → Get back an ONNX specialist fine-tuned in minutes → Runs on laptop → Conserves energy by construction → Calibrated uncertainty intervals. A startup gets Boeing-grade surrogate without HPC. 72-hour CFD → 10-millisecond inference. Design loops from months to hours.
+
+**For AI in Science:** Proof that causal inference works at scale (largest deployed causal ML in science). Proof that incentive-aligned decentralization beats centralization. A template for protein folding, materials discovery, drug design, climate modeling.
+
+**For Bittensor:** A subnet where emissions buy verified physics improvements with causal proof. A template for "knowledge-compounding" subnets. Proof that subnets can build IP assets, not just burn emissions.
+
+*Hydrogen: Where every training run teaches the network. Where physics is the only metric that pays. Where the sim-to-real gap becomes a shrinking, measured, attributable quantity.*
