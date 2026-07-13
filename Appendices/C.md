@@ -1,6 +1,12 @@
+---
+
 # Appendix C: Miner CLI Specification
 
-**Complete CLI interface for miners to interact with Hydrogen subnet.**
+**Purpose:** This document specifies the complete command-line interface for miners to interact with the Hydrogen subnet. It covers all commands, JSON schemas, configuration, Python SDK integration, and local validation tools. This is the primary interface for miners (human or agent) to participate in the subnet.
+
+---
+
+# Appendix C: Miner CLI Specification v2.1
 
 ---
 
@@ -235,7 +241,7 @@ hydrogen-miner submit-data --challenge-id <ID> --file <PATH> [OPTIONS]
 
 ---
 
-### C.2.8 `hydrogen-miner validate` — Local Validation (Pre-Submit Check)
+### C.2.7 `hydrogen-miner validate` — Local Validation (Pre-Submit Check)
 
 ```bash
 hydrogen-miner validate --challenge-id <ID> --strategy <FILE> [OPTIONS]
@@ -268,7 +274,7 @@ hydrogen-miner validate --challenge-id <ID> --strategy <FILE> [OPTIONS]
 
 ---
 
-### C.2.9 `hydrogen-miner rewards` — Check Rewards & History
+### C.2.8 `hydrogen-miner rewards` — Check Rewards & History
 
 ```bash
 hydrogen-miner rewards [OPTIONS]
@@ -389,6 +395,142 @@ print(f"Total 30-day rewards: {sum(r.reward for r in rewards)} TAO")
 
 ---
 
-*End of Appendix C: Miner CLI Specification*
+## C.5 Strategy JSON Schema (Phase 0-1)
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["backbone", "loss_vector", "optimizer", "curriculum_learning", "uq_config"],
+  "properties": {
+    "backbone": { "enum": ["FNO", "PINO", "DeepONet", "GNO", "OFormer"] },
+    "resolution": { "type": "array", "items": { "type": "integer" }, "minItems": 2, "maxItems": 3 },
+    "pino": {
+      "type": "object",
+      "properties": {
+        "loss_vector": {
+          "type": "object",
+          "properties": {
+            "pde_residual": { "type": "number", "minimum": 0 },
+            "conservation": { "type": "number", "minimum": 0 },
+            "boundary": { "type": "number", "minimum": 0 },
+            "symmetry": { "type": "number", "minimum": 0 },
+            "coupling_thermal_strain": { "type": "number", "minimum": 0 },
+            "coupling_heat_source": { "type": "number", "minimum": 0 }
+          }
+        },
+        "physics_loss_type": { "enum": ["pde_residual", "conservation", "symmetry"] },
+        "boundary_handling": { "enum": ["ghost_cells", "penalty", "lagrange", "none"] }
+      },
+    "optimizer": { "enum": ["Adam", "AdamW", "SGD"] },
+    "learning_rate": { "type": "number", "minimum": 1e-6, "maximum": 1 },
+    "scheduler": { "enum": ["None", "StepLR", "CosineAnnealingLR", "ReduceLROnPlateau"] },
+    "batch_size": { "type": "integer", "minimum": 1, "maximum": 256 },
+    "epochs": { "type": "integer", "minimum": 1, "maximum": 500 },
+    "physics_informed": { "type": "boolean" },
+    "curriculum_learning": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "start_resolution": { "type": "array", "items": { "type": "integer" } },
+        "end_resolution": { "type": "array", "items": { "type": "integer" } },
+        "ramp_epochs": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "uq_config": {
+      "type": "object",
+      "properties": {
+        "method": { "enum": ["deep_ensemble", "conformal", "evidential"] },
+        "num_members": { "type": "integer", "minimum": 2, "maximum": 10 },
+        "calibration_target": { "type": "number", "minimum": 0.8, "maximum": 0.99 }
+      }
+    },
+    "custom_data": {
+      "type": "object",
+      "properties": {
+        "data_uri": { "type": "string" },
+        "data_type": { "enum": ["npy_fields", "csv", "hdf5", "generator"] },
+        "usage": { "enum": ["augment", "curriculum", "label_only"] },
+        "weight": { "type": "number", "minimum": 0, "maximum": 0.5 },
+        "checksum": { "type": "string" },
+        "encryption": {
+          "type": "object",
+          "properties": {
+            "algorithm": { "enum": ["RSA-OAEP"] },
+            "key_id": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
+```
 
 ---
+
+## C.6 Specialist Pipeline JSON Schema (Phase 2+)
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["specialist_pipeline", "execution_schedule"],
+  "properties": {
+    "specialist_pipeline": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["specialist_id", "role", "inputs"],
+        "properties": {
+          "specialist_id": { "type": "string" },
+          "role": { "enum": ["primary", "secondary", "coupling"] },
+          "inputs": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "adapter": {
+        "type": "object",
+        "properties": {
+          "adapter_id": { "type": "string" },
+          "role": { "enum": ["coupling", "preprocessing", "postprocessing"] },
+          "params": { "type": "object" }
+        }
+      },
+      "execution_schedule": { "enum": ["staggered", "monolithic"] },
+      "max_coupling_iterations": { "type": "integer", "minimum": 1, "maximum": 20 },
+      "coupling_tolerance": { "type": "number", "minimum": 1e-6, "maximum": 1e-2 }
+    }
+  }
+}
+```
+
+---
+
+## C.7 Custom Data Schema (Phase 1+)
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["data_uri", "checksum", "usage", "weight"],
+  "properties": {
+    "data_uri": { "type": "string", "format": "uri" },
+    "data_type": { "enum": ["npy_fields", "csv", "hdf5", "generator"] },
+    "usage": { "enum": ["augment", "curriculum", "label_only"] },
+    "weight": { "type": "number", "minimum": 0, "maximum": 0.5 },
+    "checksum": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "encryption": {
+      "type": "object",
+      "properties": {
+        "algorithm": { "enum": ["RSA-OAEP"] },
+        "key_id": { "type": "string" }
+      }
+    }
+  }
+}
+```
+
+---
+
+*End of Appendix C: Miner CLI Specification*
