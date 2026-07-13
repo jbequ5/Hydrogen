@@ -1,8 +1,10 @@
----
-
 # Appendix E: Local Development Environment
 
-**Complete local development stack for Hydrogen subnet development and testing.**
+**Purpose:** This document specifies the complete local development stack for Hydrogen subnet development and testing. It includes Docker Compose stack for all services, Dockerfiles for each service, initialization scripts, test data generation, and quick-start commands. This enables developers to run the entire Hydrogen subnet locally for development and testing.
+
+---
+
+# Appendix E: Local Development Environment v2.1
 
 ---
 
@@ -585,6 +587,7 @@ echo ""
 echo "Commands:"
 echo "  docker compose logs -f api          # Follow API logs"
 echo "  docker compose logs -f indexer      # Follow indexer logs"
+echo "  docker compose logs -f validator-dev # Follow validator logs"
 echo "  docker compose exec miner-cli bash  # Enter miner CLI container"
 echo "  docker compose down -v              # Stop and remove volumes"
 ```
@@ -621,9 +624,7 @@ def generate_poisson_data(resolution, samples, dim):
         shape = (samples, *resolution, 1)
     
     f = np.random.randn(*shape).astype(np.float32)
-    # Simple Poisson solution (approximate)
     u = np.zeros_like(f)
-    # Simple Poisson solver (placeholder)
     return {"inputs": f, "targets": u}
 
 def generate_darcy_data(resolution, samples, dim):
@@ -674,16 +675,6 @@ def generate_thermo_elasticity_data(resolution, samples):
     targets = np.random.randn(samples, nt, nx, ny, 3).astype(np.float32) * 0.01  # u_x, u_y, T
     return {"inputs": inputs, "targets": targets}
 
-GENERATORS = {
-    "poisson": generate_poisson_data,
-    "darcy": generate_darcy_data,
-    "burgers": generate_burgers_data,
-    "ns": generate_ns_data,
-    "heat": generate_heat_data,
-    "elasticity": generate_elasticity_data,
-    "thermo_elasticity": generate_thermo_elasticity_data,
-}
-
 def main():
     base_path = Path("test_data")
     base_path.mkdir(parents=True, exist_ok=True)
@@ -722,7 +713,7 @@ def main():
         n_holdout = samples - n_train
         
         for split_name, n_samples in [("train", n_train), ("holdout", n_holdout)]:
-            split_path = Path("test_data") / f"challenge_{cid}_{name}" / split_path
+            split_path = Path("test_data") / f"challenge_{cid}_{name}" / split_name
             split_path.mkdir(parents=True, exist_ok=True)
             
             # Slice data
