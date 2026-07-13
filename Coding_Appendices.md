@@ -1,7 +1,86 @@
-3 Appendices for Coding Model Readiness
+# Assessment: SPEC/ROADMAP Readiness for Frontier Coding Model
 
-Appendix A: Chain Pallet Specification (Substrate/Rust)
+## Verdict: **Yes, but with 3 critical gaps** that need filling before a coding model can build autonomously.
 
+---
+
+## ✅ What's Sufficient (Ready to Code)
+
+| Component | Spec Coverage | Coding Model Can Build? |
+|-----------|---------------|------------------------|
+| **Chain Pallet Logic** | Emission math, challenge management, scoring consensus, slashing conditions | ✅ Yes — math is explicit |
+| **Validator Pipeline** | Deterministic Python pseudocode, Docker images, physics gates, scoring formula | ✅ Yes — algorithmic |
+| **Miner CLI** | JSON schemas, submission rules, fee structure | ✅ Yes — straightforward |
+| **Landscape Agent DML** | Daily causal update pseudocode, DML config, baseline proposal | ✅ Yes — algorithmic |
+| **Specialist Distillation** | Weekly distillation pseudocode, loss function, regression test | ✅ Yes — algorithmic |
+| **Challenge Generation** | Deterministic generation with Well mapping, procedural variants | ✅ Yes — algorithmic |
+| **Physics Gates** | All formulas, thresholds, phase-gated targets, 3D gates | ✅ Yes — mathematical |
+| **Scoring Formula** | Complete with log-space improvement, soft penalties, UQ bonus | ✅ Yes — mathematical |
+| **Emission Mechanics** | Challenge budget cap, 40/30/20/10 split, novelty bonus, bounty accumulation | ✅ Yes — explicit math |
+| **Agent API Schemas** | REST endpoints, request/response JSON, SDK interface | ✅ Yes — explicit contracts |
+| **Specialist Gauntlet** | 8-step pipeline, 3-judge panel, grounding gate, decontamination | ✅ Yes — procedural |
+| **Well Integration** | Per-problem mapping, sampling function | ✅ Yes — procedural |
+| **Emission Math** | Challenge budget cap, 40/30/20/10, novelty bonus, bounty accumulation | ✅ Yes |
+
+---
+
+## ❌ Critical Gaps (Coding Model Cannot Build Autonomously)
+
+### Gap 1: **Chain Pallet Implementation Details** (Substrate/Rust)
+
+| Missing | Why It Blocks |
+|---------|---------------|
+| **Storage structures** | `Challenge`, `Submission`, `Score`, `EmissionBudget`, `SpecialistRegistry` storage maps not defined |
+| **Extrinsic definitions** | `submit_strategy`, `submit_specialist_pipeline`, `validate`, `claim_rewards`, `propose_baseline` signatures not specified |
+| **Event definitions** | `ChallengeCreated`, `SubmissionReceived`, `ScoreSubmitted`, `RewardsDistributed`, `SpecialistPromoted` |
+| **Error types** | `InvalidSubmission`, `InsufficientFee`, `ChallengeNotActive`, `InvalidPhysicsGate` |
+| **Weight setting logic** | How validator median scores → miner weights → `set_weights` call |
+| **Epoch/challenge timing** | How challenge deadlines map to block numbers/epochs |
+| **Treasury/multi-sig pallet integration** | Owner treasury, time-locked vesting, 3/5 multi-sig implementation |
+
+**Impact**: Coding model can write Rust but will hallucinate storage keys, event names, and extrinsic signatures.
+
+---
+
+### Gap 2: **Validator Docker Image Specification** (Infrastructure)
+
+| Missing | Why It Blocks |
+|---------|---------------|
+| **Dockerfile templates** | Base image, PhysicsNeMo install, NeuralOperator install, entrypoint script |
+| **Entrypoint script** | `train.py`, `evaluate.py`, `stress_test.py` CLI interfaces |
+| **Config injection** | How miner JSON → environment variables / config file / CLI args |
+| **GPU/CPU resource limits** | Docker `--gpus`, `--memory`, `--cpus` per backbone |
+| **Determinism enforcement** | `torch.manual_seed`, `numpy.random.seed`, `CUDA_DETERMINISTIC=1` |
+| **Output serialization** | Standardized `ValidationResult` JSON output format |
+| **Error handling** | OOM, timeout, NaN loss, checkpoint resume |
+| **Model checkpointing** | When/where to save checkpoints for distillation |
+| **Well data mounting** | How Well slices are mounted/accessed inside container |
+
+**Impact**: Coding model can write Python but will produce non-reproducible, non-deterministic validator images.
+
+---
+
+### Gap 3: **Chain-API-Validator Integration Contracts** (Interfaces)
+
+| Missing | Why It Blocks |
+|---------|---------------|
+| **Challenge metadata on-chain** | What fields stored on-chain vs. IPFS/off-chain |
+| **Submission commitment scheme** | How miner commits to JSON before reveal (private-until-proven) |
+| **Validator assignment** | How 3+ validators selected per challenge (random? stake-weighted?) |
+| **Score submission window** | Exact block window for validators to submit scores |
+| **Consensus failure handling** | What happens if <3 validators submit, or median fails |
+| **Reward distribution extrinsic** | Who calls `distribute_rewards` (anyone? owner? automated?) |
+| **Baseline update mechanism** | How Landscape's proposed baseline JSON gets on-chain |
+| **Specialist promotion on-chain** | How team-side gauntlet result → on-chain SpecialistRegistry update |
+
+**Impact**: Coding model will design mismatched interfaces between chain, API, and validator.
+
+---
+
+## 📋 What to Add: 3 Appendices for Coding Model Readiness
+
+### Appendix A: Chain Pallet Specification (Substrate/Rust)
+```rust
 // Storage
 #[pallet::storage]
 pub type Challenges<T: Config> = StorageMap<_, Blake2_128Concat, ChallengeId, Challenge<T>>;
@@ -41,8 +120,13 @@ pub enum Event<T: Config> {
     BaselineUpdated { problem_id: ProblemId, baseline_hash: Vec<u8> },
     SpecialistPromoted { specialist_id: SpecialistId, problem_id: ProblemId },
 }
-Appendix B: Validator Docker Specification
+```
 
+---
+
+### Appendix B: Validator Docker Specification
+
+```dockerfile
 # Dockerfile.template
 FROM nvcr.io/nvidia/pytorch:24.09-py3
 
@@ -64,7 +148,9 @@ WORKDIR /workspace/validator
 
 # Entrypoint
 ENTRYPOINT ["python", "entrypoint.py"]
+```
 
+```python
 # entrypoint.py
 import os, json, torch, numpy as np
 from validator.train import train_backbone
@@ -133,8 +219,13 @@ def main():
     # Write output
     with open("/workspace/output/result.json", "w") as f:
         json.dump(result.dict(), f)
-Appendix C: Chain-API-Validator Integration Contract
+```
 
+---
+
+### Appendix C: Chain-API-Validator Integration Contract
+
+```yaml
 # integration_contract.yaml
 
 chain:
@@ -228,3 +319,7 @@ validator:
     numpy_seed: "HYDROGEN_SEED"
     cuda_deterministic: true
     cudnn_benchmark: false
+```
+
+---
+
