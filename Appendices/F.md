@@ -1,8 +1,10 @@
----
-
 # Appendix F: Testing & CI/CD Specification
 
-**Complete testing strategy, CI/CD pipelines, and quality gates for Hydrogen subnet.**
+**Purpose:** This document specifies the complete testing strategy, CI/CD pipelines, and quality gates for the Hydrogen subnet. It covers unit testing, integration testing, end-to-end testing, determinism validation, physics regression testing, performance benchmarks, and the complete CI/CD pipeline configuration. This ensures the subnet meets the highest standards of correctness, determinism, and physics fidelity.
+
+---
+
+# Appendix F: Testing & CI/CD Specification v2.1
 
 ---
 
@@ -367,7 +369,7 @@ integration_test_suites:
       2. Load NS 2D challenge data
       3. Submit valid PINO strategy JSON
       2. Train on public train split
-      3. Evaluate on holdout
+      3. Evaluate on public holdout
       3. Run hidden stress test (procedural + Well)
       4. Compute score with physics gates
       5. Verify score > 0 for valid strategy
@@ -383,13 +385,13 @@ integration_test_suites:
     steps:
       1. Ingest 100 StrategyFragments for NS 2D
       2. Select top-5 by score
-      3. Multi-teacher distillation (50% width student)
+      3. Multi-teacher distillation → Student (same backbone, 50% width)
       3. Regression test against stress tests
       4. 3-judge panel evaluation (different backbones)
       4. Grounding gate check
-      5. Decontamination check
-      6. Triple Crown consistency
-      7. Publish to Specialist Bank
+      6. Decontamination check
+      7. Triple Crown consistency
+      8. Publish to Specialist Bank
     success_criteria:
       - Specialist passes all stress tests
       - All 3 judges pass
@@ -442,7 +444,7 @@ integration_test_suites:
       2. Repair loop if any judge fails
       2. Grounding gate (lineage check)
       2. Decontamination check (Well holdout)
-      2. Triple Crown (3+ variations)
+      2. Triple Crown consistency
     success_criteria:
       - Only specialists passing all gates promoted
       - Failed judges trigger repair loop
@@ -525,7 +527,7 @@ e2e_test_scenarios:
       1. Enable LoRA adapters and custom data
       2. Miners submit adapters + custom data
       2. Data royalty pool activates
-      2. Weekly specialist distillation begins
+      2. First ONNX specialists distilled
       2. Specialist Bank reaches 20+ specialists
     success_criteria:
       - ≥20 specialists in bank
@@ -556,7 +558,7 @@ e2e_test_scenarios:
       2. 3D Spectral Initialization Protocol developed
       2. 3D Turbulence Curriculum (Re=50→500)
       2. ns_3d_turbulent_v1 trained
-      2. 3D stress gates pass
+      2. 3D-specific stress gates: energy spectrum, Q-criterion, wall shear, Nu distribution
       2. Gate passed → 3D multi-physics opens
     success_criteria:
       - ns_3d_turbulent_v1 passes k^(-5/3), Q-criterion, wall shear, Nu
@@ -975,4 +977,4 @@ jobs:
 
 ---
 
-*End of Appendix F: Testing & CI/CD Specification*
+*End of Appendix F: Testing & CI/CD Specification v2.1*
