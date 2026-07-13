@@ -1,6 +1,10 @@
 # Appendix D: Dashboard & Indexer Specification
 
-**GraphQL API, real-time subscriptions, and data models for the Hydrogen Dashboard & Indexer.**
+**Purpose:** This document specifies the complete Dashboard & Indexer architecture for the Hydrogen subnet, including the GraphQL API schema, REST API endpoints, database schema, real-time subscriptions, indexer architecture, and webhook endpoints. This is the data layer that powers the Hydrogen dashboard, provides query access to subnet state, and enables real-time monitoring of challenges, submissions, specialists, and network health.
+
+---
+
+# Appendix D: Dashboard & Indexer Specification v2.1
 
 ---
 
@@ -928,4 +932,4 @@ POST /webhooks/baseline-updated
 
 ---
 
-*End of Appendix D: Dashboard & Indexer Specification*
+*End of Appendix D: Dashboard & Indexer Specification v2.1*
