@@ -1,3 +1,7 @@
+You're right - I missed several sections from the original v1.0 format. Let me provide the **complete SPEC.md v2.1** with all original sections restored plus all new additions.
+
+---
+
 # SPEC.md — Hydrogen PDE Subnet Technical Specification v2.1
 
 ---
