@@ -1,4 +1,4 @@
-# ROADMAP.md — Hydrogen Subnet Technical Roadmap
+# ROADMAP.md — Hydrogen Subnet Technical Roadmap v2.1
 
 ---
 
@@ -13,20 +13,19 @@ This document defines the phased execution plan for Hydrogen, from launch throug
 ### Objective
 Establish the causal flywheel: miners submit strategies → validators verify with physics gates → Landscape distills causal knowledge → baseline improves.
 
-### Scope: 10 Problems, Full PDE Taxonomy (2D + 3D Elliptic/Parabolic)
+### Scope: 7 Problems, Full PDE Taxonomy (2D + 3D Elliptic/Parabolic + Nonlinear + Multi-Physics)
 
 | # | Problem | Dimension | Physics Class | Reference Source |
 |---|---------|-----------|---------------|------------------|
-| 1 | Poisson | 2D | Elliptic, constant-coeff | PhysicsNeMo |
-| 2 | Poisson | 3D | Elliptic, 3D scaling | PhysicsNeMo |
-| 3 | Darcy | 2D | Elliptic, variable-coeff | PhysicsNeMo / PDEBench |
-| 4 | Darcy | 3D | Elliptic, 3D hetero | PhysicsNeMo / PDEBench |
-| 5 | Burgers | 2D | Nonlinear advection/shocks | PhysicsNeMo |
-| 6 | Navier-Stokes | 2D | Incompressible, vorticity | PhysicsNeMo / JHTDB |
-| 7 | Navier-Stokes | 3D | Low-Re laminar (Re≤100) | PhysicsNeMo |
-| 8 | Heat | 2D | Transient, variable κ | PhysicsNeMo |
-| 9 | Elasticity | 2D | Vector, tensor physics | PhysicsNeMo |
-| 10 | Thermo-elasticity | 2D | **Multi-physics, loss_vector** | Generated (48 Tier 1 refs) |
+| 1 | Poisson | 2D / 3D | Elliptic, constant-coeff | PhysicsNeMo |
+| 2 | Darcy | 2D / 3D | Elliptic, variable-coeff | PhysicsNeMo / PDEBench |
+| 3 | Burgers | 2D | Nonlinear advection/shocks | PhysicsNeMo |
+| 4 | Navier-Stokes | 2D / 3D | Incompressible (2D vortex / 3D laminar Re≤100) | PhysicsNeMo / JHTDB |
+| 5 | Heat | 2D | Transient, variable κ | PhysicsNeMo |
+| 6 | Elasticity | 2D | Vector, tensor physics | PhysicsNeMo |
+| 7 | Thermo-elasticity | 2D | **Multi-physics, loss_vector** | Generated (48 Tier 1 refs) |
+
+**Each challenge provides:** public training split, public holdout set, hidden stress test (procedural parameter/geometry shifts + **The Well data slices**, seeded by challenge_id). **The Well data slices are custom per challenge** (see Section 4.6 in SPEC).
 
 ### Technical Deliverables
 
@@ -46,21 +45,32 @@ Establish the causal flywheel: miners submit strategies → validators verify wi
 - Baseline proposal: updated JSON with strongest causal effects
 - Fragment DAG with `causal_parents` lineage tracking
 
+**Agent Infrastructure (Phase 0 MVP)**
+- **REST API**: `/challenges`, `/baseline`, `/priors`, `/specialists`, `/submit`
+- **hydrogen-agent Python SDK**: local validation, baseline/prior loading, mutation helpers, submission wrapper
+- **Structured feedback**: physics gate breakdown, stress test details, causal insights, suggestions
+
+**The Well Integration (Phase 0)**
+- **Custom per-challenge stress test slices** from The Well (15TB multi-domain physics dataset)
+- **Well mapping per problem**: Poisson→active_matter, Darcy→active_matter, Burgers→turbulence/viscoelastic, NS→turbulence/mhd, Heat→acoustic_scattering, Elasticity→active_matter/viscoelastic, Thermo-elasticity→active_matter/viscoelastic
+- **1-2 optional "The Well Track" challenges** as non-core stretch goals
+
 ### Exit Criteria (All Required)
 - [ ] Baseline log-improvement > 0.02/challenge averaged over 30 challenges
 - [ ] ≥30 unique miners submitting
 - [ ] ≥5 validators operational
 - [ ] Landscape proposing baseline updates that improve next-challenge baseline
-- [ ] All 10 problems have active competition
+- [ ] All 7 problems have active competition
+- [ ] Agent SDK (`hydrogen-agent`) published and documented
 
 ### Revenue at Phase 0 Exit
-- **Asset:** Causal Knowledge Graph (500+ causally-validated interventions)
-- **TAM:** $2-5M/yr licensing to NVIDIA/ANSYS/Siemens for "training best practices"
+- **Asset:** Causal Knowledge Graph (500+ causally-validated interventions across 7 PDE problems)
+- **TAM:** $2-5M/yr licensing to NVIDIA/ANSYS/Siemens for "training best practices" datasets
 - **Revenue model:** API access to causal graph + baseline configs
 
 ---
 
-## Phase 1: Adapters, Data Markets & Specialist Distillation (Months 3-6)
+## Phase 1: Specialist Bank & Data Markets (Months 3-6)
 
 ### Objective
 Enable fine-grained innovation (adapters), reward data contribution, produce first verified specialists.
@@ -110,7 +120,7 @@ Enable fine-grained innovation (adapters), reward data contribution, produce fir
 - **Asset:** Specialist Bank (20-30 verified ONNX specialists, dual-licensed)
 - **TAM:** $10-50M/yr
   - Specialist licensing (AGPL-3.0 ecosystem + commercial dual-license)
-  - Data royalties from custom datasets
+  - Data royalties from custom datasets (The Well as primary source)
   - Fine-tuning services on encrypted client data (TEE)
 
 ---
@@ -126,7 +136,7 @@ Prove composition > monolith on multi-physics. Build composable specialist marke
 | Problem | Source | Status | Specialist Pair |
 |---------|--------|--------|-----------------|
 | FSI 2D-1/2/3 | Turek/Hron | Verified, mesh-converged | `ns_2d` + `elasticity_2d` + `fsi_coupling` |
-| CHT: Solid cooling / Electronic | PDEBench | Verified, mesh-converged | `ns_2d` + `heat_2d` + `cht_coupling` |
+| CHT: Solid cooling / Electronics | PDEBench | Verified, mesh-converged | `ns_2d` + `heat_2d` + `cht_coupling` |
 
 ### Phase 2B: Thermo-Elasticity (Month 3)
 **Only new data generation needed.** Generate 48 Tier 1 references (β×κ×geometry) at 256² with FEniCS monolithic, mesh-converged (3 levels). Cost: ~$3K.
@@ -151,11 +161,43 @@ New Re, geometries, coupling strengths on FSI/CHT/thermo-elasticity using existi
 ### Three-Track Leaderboard (Every Multi-Physics Challenge)
 | Track | Submission | What It Proves |
 |-------|------------|----------------|
-| **Monolith** | Single strategy JSON (end-to-end) | Can monolith beat composition? |
+| **Monolith** | Single strategy JSON (end-to-end) | Can a monolithic model beat composition? |
 | **Composition** | Specialist pipeline + adapter | Does composition beat monolith? |
-| **Specialist-Only** | Single specialist (no adapter) | How much does adapter matter? |
+| **Specialist-Only** | Single specialist (no adapter) | How much does the adapter matter? |
 
-**Same hidden stress test, same physics gates, three parallel leaderboards.**
+**Same hidden stress test, same physics gates, three parallel leaderboards.** The Composition track is where miners build **customizable surrogates** — assembling verified specialists with adapters for specific multi-physics problems.
+
+### Specialist Promotion Gauntlet (Phase 2+)
+**Team-side only. Validators are NOT involved.**
+
+#### 6.1 Promotion Pipeline
+```
+1. Multi-teacher distillation → candidate specialist
+2. Regression test: MUST pass SAME stress tests as miners
+3. Judge Panel: 3 judges (team-side, different backbones) re-run + vote
+4. Repair Loop: If any judge fails → specialist rejected → feedback to Landscape
+5. Grounding Gate: Explicit lineage to validated fragments + physics gate passes
+6. Decontamination Check: Verify no memorization of public holdout sets
+7. Triple Crown Consistency: Pass across 3+ challenge variations
+8. Promote to Specialist Bank with validity domain
+```
+
+#### Judge Panel
+- **3 judges** (team-side, different backbones: FNO, PINO, DeepONet)
+- Unanimous pass required
+- Failed judge → repair loop → feedback to Landscape Agent
+
+#### Grounding Gate
+- `distilled_from` field lists Fragment IDs of teacher strategies
+- Each fragment must have passed physics gates
+- Causal lineage traceable to baseline improvements
+
+#### Decontamination Check
+- Test on held-out Well slices not used in training
+- Check for exact memorization vs. generalization
+
+#### Triple Crown Consistency
+Specialist must pass stress tests across **3+ challenge variations** (different Re, geometries, coupling strengths).
 
 ### Phase 2C Exit Criteria (Go/No-Go for 3D)
 | Metric | Target | If Missed |
@@ -174,9 +216,20 @@ New Re, geometries, coupling strengths on FSI/CHT/thermo-elasticity using existi
 
 ---
 
-## Phase 3: The 3D Transition & Foundation Operator (Months 18+)
+## Phase 3: 3D Transition & Foundation Operator (Months 18+)
 
-### Phase 3.0: 3D Single-Physics Foundations (Prerequisite)
+### Phase 3 Entry Gates (All Required)
+| Gate | Metric | Threshold |
+|------|--------|-----------|
+| 2D composition proven | Composition win rate >60% | Phase 2 complete |
+| 3D single-physics specialists exist | ≥6 specialists in Bank | Phase 3.0 prereq |
+| Curriculum validated | 2D→3D fine-tune <50% scratch cost | Ablation study |
+| 3D reference pipeline works | Tier 1 3D reference generated, mesh-converged | Pipeline test |
+| Validator quorum | ≥5 validators with 24GB+ GPUs | Infrastructure ready |
+
+---
+
+## Phase 3.0: 3D Single-Physics Foundations (Prerequisite)
 **Before any 3D multi-physics, these MUST exist in Specialist Bank:**
 
 | 3D Specialist | Source | Validation |
@@ -196,12 +249,14 @@ stage_3: unfreeze all, 128³, 50 epochs, physics_informed + distillation_loss(te
 stage_4: 128³ stress test validation + must_pass_2d_stress_tests_in_3d
 ```
 
-### Phase 3.1: 3D Turbulence Bridge (Months 1-3) — CRITICAL PHASE
-**2D NS does not prepare for 3D turbulence.** Dedicated phase to learn 3D turbulence from scratch.
+---
+
+## Phase 3.1: 3D Turbulence Bridge (Critical - Months 1-3)
+**2D NS does not prepare for 3D turbulence.** Dedicated phase to learn 3D turbulence FROM SCRATCH.
 
 | Week | Activity | Deliverable |
 |------|----------|-------------|
-| 1-2 | 3D Spectral Initialization Protocol | Proper 3D spectral init (not zero-pad) using 3D energy spectrum priors |
+| 1-2 | 3D Spectral Initialization Protocol | Proper 3D spectral init (NOT zero-pad) using 3D energy spectrum priors |
 | 3-4 | 3D Turbulence Curriculum | Re=50→100→200→500 on channel/cylinder |
 | 5-6 | 3D Turbulence Specialist | `ns_3d_turbulent_v1` with verified `k^(-5/3)` spectrum |
 | 7-8 | 3D FSI Bridge | `ns_3d_turbulent` + `elasticity_3d` + FSI adapter |
@@ -209,7 +264,18 @@ stage_4: 128³ stress test validation + must_pass_2d_stress_tests_in_3d
 
 **Gate:** `ns_3d_turbulent_v1` passes 3D turbulence stress tests → open 3D multi-physics.
 
-### Phase 3.2: 3D Multi-Physics Rollout
+### Phase 3.1 Gate (All Required Before 3.2)
+| Metric | Threshold |
+|--------|-----------|
+| Energy spectrum | Verified k^(-5/3) scaling |
+| Q-criterion gate | Pass |
+| Wall shear stress distribution | Pass |
+| Nu distribution (3D corners) | Pass |
+| Stress test pass rate | >70% |
+
+---
+
+## Phase 3.2: 3D Multi-Physics Rollout
 
 | Phase | Challenges | Specialist Composition | Reference |
 |-------|------------|------------------------|-----------|
@@ -219,7 +285,9 @@ stage_4: 128³ stress test validation + must_pass_2d_stress_tests_in_3d
 
 **Three-track leaderboard continues. Same stress test infrastructure.**
 
-### Phase 3.3: Foundation Operator (LPM)
+---
+
+## Phase 3.3: Foundation Operator (LPM)
 **Multi-teacher distillation across entire Specialist Bank (2D + 3D).**
 
 ```
@@ -258,6 +326,124 @@ def fine_tune_lpm(client_encrypted_data, problem_signature):
 
 ---
 
+## Key Technical Specifications Summary
+
+### Emission Mechanics (All Phases)
+- **Challenge Budget:** `total_emission / min(active_challenges, 10)`
+- **Top-4 Split:** 40% / 30% / 20% / 10% of challenge budget
+- **Novelty Bonus:** 5% of challenge budget, physics-informed embeddings, **only if improvement > 0**
+- **Bounty Accumulation:** Emissions pool until log-improvement > 0
+- **Private-until-proven:** Strategies revealed only after earning rewards
+- **Miner burn:** 0%
+- **Warm-up:** <10 submissions → top 3 split 50/30/20 (only if improvement > 0)
+
+### Phase-Gated Physics Requirements
+
+| Requirement | Phase 0-1 | Phase 2 | Phase 3 |
+|-------------|-----------|---------|---------|
+| **UQ Calibration** | 90% | 95% | 99% |
+| **Rollout Steps** | 100 | 100 | 1000+ + spectral stationarity |
+| **UQ Bonus** | 5% at 90% | 5% at 95% | 5% at 99% |
+| **NS Rollout** | 100 steps | 100 steps | 1000+ steps + spectral stationarity |
+| **Thermo-elasticity Rollout** | 100 steps | 100 steps | 1000+ steps |
+
+### 3D-Specific Stress Gates (Phase 3+)
+| Gate | Formula | Threshold |
+|------|---------|-----------|
+| Energy Spectrum | `‖E_pred(k) - C·k^(-5/3)‖ / ‖E_true(k)‖` | `< 0.1` |
+| Q-Criterion | `‖Q_pred - Q_true‖₂ / ‖Q_true‖₂` | `< 0.15` |
+| Wall Shear Stress | `‖τ_w_pred - τ_w_true‖₂ / ‖τ_w_true‖₂` | `< 0.1` |
+| Nu Distribution (Corners) | `‖Nu_pred - Nu_true‖₂ / ‖Nu_true‖₂` | `< 0.2` |
+| Added-Mass Tensor | `‖A_pred - A_true‖_F / ‖A_true‖_F` | `< 0.1` |
+
+### Thermo-Elasticity Coupling (Bidirectional)
+```json
+"loss_vector": {
+  "elasticity_residual": 1.0,
+  "heat_residual": 0.8,
+  "coupling_thermal_strain": 0.5,    // α * ΔT * I (thermal → mechanical)
+  "coupling_heat_source": 0.3,       // β * ∂(∇·u)/∂t (mechanical → thermal)
+  "boundary": 0.5
+}
+```
+
+### 3D Spectral Initialization (Correct)
+```python
+def init_3d_spectral_from_2d(weights_2d, spectrum="kolmogorov"):
+    # 1. Initialize 3D modes with target spectrum E(k) ~ k^(-5/3)
+    # 2. Project 2D modes onto k_z=0 plane with energy scaling
+    # 3. Add controlled noise in orthogonal directions (σ ~ 0.01)
+    # 4. DO NOT copy 2D weights directly — 2D spectrum is k^(-3), not k^(-5/3)
+```
+
+### Phase-Gated UQ & Rollout
+```python
+def get_phase_targets(phase):
+    if phase <= 1: return {"uq_target": 0.90, "rollout_steps": 100}
+    elif phase == 2: return {"uq_target": 0.95, "rollout_steps": 100}
+    else: return {"uq_target": 0.99, "rollout_steps": 1000}
+```
+
+---
+
+## Phase 3.1: 3D Turbulence Bridge (Critical - Months 1-3)
+**2D NS does not prepare for 3D turbulence.** Dedicated phase to learn 3D turbulence FROM SCRATCH.
+
+| Week | Activity | Deliverable |
+|------|----------|-------------|
+| 1-2 | 3D Spectral Initialization Protocol | Proper 3D spectral init (NOT zero-pad) using 3D energy spectrum priors |
+| 3-4 | 3D Turbulence Curriculum | Re=50→100→200→500 on channel/cylinder |
+| 5-6 | 3D Turbulence Specialist | `ns_3d_turbulent_v1` with verified `k^(-5/3)` spectrum |
+| 7-8 | 3D FSI Bridge | `ns_3d_turbulent` + `elasticity_3d` + FSI adapter |
+| 9-10 | 3D Turbulence Stress Gates | Energy spectrum, Q-criterion, wall shear, Nu distribution |
+
+**Gate:** `ns_3d_turbulent_v1` passes 3D turbulence stress tests → open 3D multi-physics.
+
+### Phase 3.1 Gate (All Required Before 3.2)
+| Metric | Threshold |
+|--------|-----------|
+| Energy spectrum | Verified k^(-5/3) scaling |
+| Q-criterion gate | Pass |
+| Wall shear stress distribution | Pass |
+| Nu distribution (3D corners) | Pass |
+| Stress test pass rate | >70% |
+
+---
+
+## Phase 3.2: 3D Multi-Physics Rollout
+
+| Phase | Challenges | Specialist Composition | Reference |
+|-------|------------|------------------------|-----------|
+| **3.2A** 3D FSI | Cylinder, flap, turbulent inflow | `ns_3d_turbulent` + `elasticity_3d` + `fsi_3d_adapter` | preCICE partitioned |
+| **3.2B** 3D Thermo-Elasticity | Bimetal, engine block, turbine blade | `elasticity_3d` + `heat_3d` + `thermal_expansion_3d` | FEniCS monolithic |
+| **3.2C** 3D CHT | Electronics, turbine cooling, battery | `ns_3d_turbulent` + `heat_3d` + `cht_3d_adapter` | OpenFOAM/COMSOL |
+
+**Three-track leaderboard continues. Same stress test infrastructure.**
+
+---
+
+## Phase 3.3: Foundation Operator (LPM)
+
+**Product:** A single unified neural operator conditioned on ProblemSignature that solves any PDE in the taxonomy. Fine-tunable on encrypted client data in minutes (TEE). Commercial fine-tuning API.
+
+- **Multi-teacher distillation** across entire Specialist Bank (2D + 3D)
+- **Conditioning:** ProblemSignature → FiLM layers modulate backbone
+- **UQ Head:** Evidential (μ, σ, ν, α for Student-t)
+- **Commercial API:** Client submits encrypted geometry/data → TEE fine-tuning (10-50 steps) → verified, calibrated, physics-compliant ONNX specialist returned in minutes
+
+---
+
+## Revenue & TAM Summary by Phase
+
+| Phase | Primary Asset | Revenue Streams | TAM | Timeline |
+|-------|---------------|-----------------|-----|----------|
+| **Phase 0** | Causal Knowledge Graph | Licensing to NVIDIA/ANSYS/Siemens | $2-5M/yr | Month 3 |
+| **Phase 1** | Specialist Bank (20-30) | Licensing (dual), data royalties, fine-tuning API | $10-50M/yr | Month 6 |
+| **Phase 2** | Composition Engine + Bank (50+) | Licensing, custom pipelines, enterprise contracts | $50-200M/yr | Month 12-18 |
+| **Phase 3** | Foundation Operator (LPM) | API ($500-5K/model), custom surrogates ($50K-500K), enterprise platform | $1B+ | Year 2-3 |
+
+---
+
 ## Risk Mitigation & Pivot Points
 
 | Risk | Probability | Mitigation | Pivot Trigger |
@@ -274,9 +460,9 @@ def fine_tune_lpm(client_encrypted_data, problem_signature):
 
 | Phase | Business Status | Technical Risk | Revenue Independence |
 |-------|-----------------|----------------|----------------------|
-| **Phase 0** | Proven flywheel, sellable asset | Low | ✅ Independent |
-| **Phase 1** | Specialist marketplace, recurring revenue | Low | ✅ Independent |
-| **Phase 2** | Composition engine, high-value IP | Medium (multi-physics benchmarks) | ✅ Independent of 3D |
+| **Phase 0** | Proven flywheel, sellable asset | Low | ✅ Yes |
+| **Phase 1** | Specialist marketplace, recurring revenue | Low | ✅ Yes |
+| **Phase 2** | Composition engine, high-value IP | Medium | ✅ Yes (2D multi-physics) |
 | **Phase 3** | Moonshot (LPM) | **High (3D turbulence)** | ❌ Depends on 3D turbulence |
 
 **The business is real at Phase 1. Profitable at Phase 2. Phase 3 is the 100x lottery ticket.**
