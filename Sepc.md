@@ -1,6 +1,3 @@
-You're right - I condensed too much. The v2.1 I output is missing significant content from v2.0 (Specialist Bank details, Foundation Operator full section, full Implementation Checklist, full Appendix). Let me restore the **complete, unabridged v2.1** with all v2.0 content preserved plus all updates.
-
----
 
 # SPEC.md — Hydrogen PDE Subnet Technical Specification v2.1 (Complete)
 
