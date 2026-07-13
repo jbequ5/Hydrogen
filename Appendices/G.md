@@ -1,6 +1,10 @@
 # Appendix G: Operational Runbook
 
-**Operational procedures, incident response, runbooks, and SOPs for Hydrogen subnet operations.**
+**Purpose:** This document specifies the complete operational procedures, incident response runbooks, maintenance procedures, backup/disaster recovery, security incident response, and communication protocols for the Hydrogen subnet operations team. This is the operational handbook for running the subnet in production.
+
+---
+
+# Appendix G: Operational Runbook v2.1
 
 ---
 
@@ -130,7 +134,7 @@ severity_levels:
 1. Check subtensor process status: `systemctl status subtensor` or `docker ps`
 2. Check subtensor logs: `docker logs hydrogen-subtensor --tail 100`
 3. Check peer count: `curl -s http://localhost:9933 | jq '.peers'`
-3. Check disk space: `df -h /data`
+4. Check disk space: `df -h /data`
 4. Check memory: `free -h`
 
 ## Common Causes & Fixes
@@ -399,7 +403,7 @@ docker restart hydrogen-indexer
 
 ---
 
-#### RUNBOOK-004: Physics Gate False Positives / Bug
+#### RUNBOOK-004: Physics Gate Bug / False Positive
 
 ```markdown
 # RUNBOOK-004: Physics Gate Bug / False Positive
@@ -805,7 +809,7 @@ recovery_point_objectives:
    # Restart Redis
    ```
 
-4. Restore MinIO (versioned, so latest)
+4. Restore MinIO (versioning enabled, so latest)
    ```bash
    # MinIO versioning handles this automatically
    mc mirror s3/hydrogen-backups/minio/ minio/hydrogen/
@@ -1135,4 +1139,4 @@ compensation:
 
 ---
 
-*End of Appendix G: Operational Runbook*
+*End of Appendix G: Operational Runbook v2.1*
