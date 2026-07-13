@@ -1,5 +1,3 @@
----
-
 # Appendix C: Miner CLI Specification
 
 **Purpose:** This document specifies the complete command-line interface for miners to interact with the Hydrogen subnet. It covers all commands, JSON schemas, configuration, Python SDK integration, and local validation tools. This is the primary interface for miners (human or agent) to participate in the subnet.
