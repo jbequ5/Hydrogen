@@ -1,5 +1,4 @@
-
-# SPEC.md — Hydrogen PDE Subnet Technical Specification v2.1 (Complete)
+# SPEC.md — Hydrogen PDE Subnet Technical Specification v2.2 (Complete with Symbolic Layer)
 
 ---
 
@@ -30,6 +29,8 @@ Open Challenge → Miner Strategy JSON → Validator Training → Physics-Gated 
 
 **Novelty Bonus:** 5% of challenge budget awarded for strategies with high physics-informed embedding-space distance from recent winners, **only if improvement > 0**.
 
+**Symbolic Bonus:** 2% of challenge budget awarded for strategies using auto-generated symbolic features that improve baseline by >5%.
+
 **Bounty Accumulation:** Emissions accumulate until a submission meaningfully beats the current baseline (log-improvement > 0).
 
 **Submission fee:** 0.1 TAO (burned if validation fails pre-checks; covers validator marginal cost ~0.08 TAO/run)
@@ -39,7 +40,7 @@ Open Challenge → Miner Strategy JSON → Validator Training → Physics-Gated 
 **Private-until-proven:** Strategies revealed only after earning rewards.
 
 **Warm-up:** <10 distinct submissions/challenge → top 3 split 50/30/20 (only if improvement > 0)  
-**Competitive:** Top-4 split as above (40/30/20/10) + novelty bonus (5%, improvement-gated)
+**Competitive:** Top-4 split as above (40/30/20/10) + novelty bonus (5%, improvement-gated) + symbolic bonus (2%, improvement >5%)
 
 ---
 
@@ -84,7 +85,12 @@ Open Challenge → Miner Strategy JSON → Validator Training → Physics-Gated 
     "checksum": "sha256:...",
     "usage": "augment",
     "weight": 0.25
-  }
+  },
+  "auto_loss_weights": true,
+  "symbolic_constraints": [
+    "divergence_free: hard_constraint",
+    "energy_dissipation: hard_constraint"
+  ]
 }
 ```
 
@@ -144,7 +150,10 @@ def validate_submission(challenge_id: str, miner_submission: dict) -> Validation
     train_data, holdout_data, stress_data = load_challenge_splits(challenge_id)
     challenge = load_challenge_metadata(challenge_id)
     
-    # 2. Determine submission type and execute
+    # 2. Enrich challenge with symbolic metadata
+    symbolic_metadata = enrich_challenge(challenge_id, challenge_data_path)
+    
+    # 3. Determine submission type and execute
     if "specialist_pipeline" in miner_submission:
         # Phase 2+: Composition track
         model = execute_specialist_pipeline(
@@ -163,18 +172,18 @@ def validate_submission(challenge_id: str, miner_submission: dict) -> Validation
             seed=derive_seed(challenge_id, validator_hotkey)
         )
     
-    # 3. Evaluate on public holdout
+    # 4. Evaluate on public holdout
     E_baseline = load_current_baseline_error(challenge_id)
     E_submission = evaluate(model, holdout_data, challenge)
     improvement = log(E_baseline) - log(E_submission)
     
-    # 4. Hidden stress test + physics gates
+    # 5. Hidden stress test + physics gates
     stress_result = run_stress_test(model, stress_data, challenge)
     
-    # 5. UQ calibration check
+    # 6. UQ calibration check
     uq_metrics = evaluate_uq(model, stress_data, miner_submission.get("uq_config", {}))
     
-    # 6. Compute score
+    # 7. Compute score
     if stress_result.hard_failure:
         score = 0.0
         reason = stress_result.failure_reason
@@ -182,7 +191,8 @@ def validate_submission(challenge_id: str, miner_submission: dict) -> Validation
         base_score = max(0.0, improvement)
         soft_penalty = stress_result.soft_penalty
         uq_bonus = uq_calibration_bonus(uq_metrics, challenge.phase)
-        score = (base_score * soft_penalty) + uq_bonus
+        symbolic_bonus = 0.02 if symbolic_features_used and improvement > 0.05 else 0.0
+        score = (base_score * soft_penalty) + uq_bonus + symbolic_bonus
     
     return ValidationResult(score, improvement, stress_result, uq_metrics)
 ```
@@ -236,7 +246,8 @@ Else:
     base_improvement = max(0, log(E_baseline) - log(E_submission))
     soft_penalty = Π(soft_gate_penalties)  ∈ [0, 1]
     uq_bonus = uq_calibration_bonus(uq_metrics, challenge.phase)
-    score = (base_improvement * soft_penalty) + uq_bonus
+    symbolic_bonus = 0.02 if symbolic_features_used and improvement > 0.05 else 0.0
+    score = (base_improvement * soft_penalty) + uq_bonus + symbolic_bonus
 
 def uq_calibration_bonus(uq_metrics, phase):
     if phase <= 1: target = 0.90
@@ -269,7 +280,10 @@ def uq_calibration_bonus(uq_metrics, phase):
 | 6 | Elasticity | 2D | Vector, tensor physics | 128² | PhysicsNeMo |
 | 7 | Thermo-elasticity | 2D | Multi-physics, loss_vector | 128²×50 | Generated (48 Tier 1) |
 
-**Each challenge provides:** public training split, public holdout set, hidden stress test (procedural + Well data, seeded by challenge_id).
+**Each challenge provides:** public training split, public holdout set, hidden stress test (procedural + Well data, seeded by challenge_id), **symbolic metadata**.
+
+### 4.2 Phase 1: Same Challenges + Customization
+Same 7 problems. Miners add LoRA adapters and custom datasets.
 
 ### 4.2 Phase 1: Same Challenges + Customization
 Same 7 problems. Miners add LoRA adapters and custom datasets.
@@ -304,6 +318,9 @@ def generate_challenge(challenge_id: str, problem_id: int) -> Challenge:
     stress = generate_stress_test(problem_id, rng)
     baseline = get_current_baseline(problem_id)
     
+    # NEW: Generate symbolic metadata
+    symbolic_metadata = generate_symbolic_metadata(problem_id, rng)
+    
     return Challenge(
         challenge_id=challenge_id,
         problem_id=problem_id,
@@ -312,11 +329,25 @@ def generate_challenge(challenge_id: str, problem_id: int) -> Challenge:
         stress_data=stress,
         baseline_config=baseline,
         submission_deadline=now() + 20_hours,
-        stress_floors=get_stress_floors(problem_id)
+        stress_floors=get_stress_floors(problem_id),
+        symbolic_metadata=symbolic_metadata  # NEW
     )
 ```
 
-### 4.6 Hidden Stress Test Generation with The Well
+### 4.6 Symbolic Metadata Generation (Per Challenge)
+```python
+def generate_symbolic_metadata(problem_id: int, rng) -> SymbolicMetadata:
+    """
+    Generates symbolic metadata for a challenge using ModelingToolkit.
+    Runs once per challenge type, cached forever.
+    """
+    # Parse PDE → symbolic system
+    # Extract: symmetries, conservation laws, dimensionless groups, 
+    # boundary types, coupling terms, validity domain
+    # Return structured SymbolicMetadata protobuf
+```
+
+### 4.7 Hidden Stress Test Generation with The Well
 ```python
 def generate_stress_test(problem_id: int, rng: np.random.Generator) -> StressTestData:
     procedural_variants = generate_procedural_variants(problem_id, rng)
@@ -346,8 +377,11 @@ def get_well_slices_for_problem(problem_id: int, rng: np.random.Generator) -> Li
 | **Monolith** | Single strategy JSON (end-to-end training config) | Can a monolithic model beat composition? |
 | **Composition** | Specialist pipeline with adapters | Does composition beat monolith? |
 | **Specialist-Only** | Single specialist ID (no adapter) | How much does the adapter matter? |
+| **Symbolic Regression** | Discovered PDE string + basis | Can the agent discover governing PDE from data? |
+| **Symbolic Composition** | MTK component graph + adapters | Can symbolic components compose to beat monolith? |
+| **Symbolic Distillation** | ONNX + symbolic metadata + CUDA kernel | Can specialist be compressed with symbolic metadata preserved? |
 
-**Same hidden stress test, same physics gates, three parallel leaderboards.**
+**Same hidden stress test, same physics gates, six parallel leaderboards.**
 
 ---
 
@@ -364,7 +398,8 @@ def get_well_slices_for_problem(problem_id: int, rng: np.random.Generator) -> Li
 5. Grounding Gate: Explicit lineage to validated fragments + physics gate passes
 6. Decontamination Check: Verify no memorization of public holdout sets
 7. Triple Crown Consistency: Pass across 3+ challenge variations
-8. Promote to Specialist Bank with validity domain
+8. Symbolic Gauntlet: Verify symbolic metadata preserved + CUDA codegen works
+9. Promote to Specialist Bank with validity domain
 ```
 
 ### 6.2 Judge Panel
@@ -383,6 +418,12 @@ def get_well_slices_for_problem(problem_id: int, rng: np.random.Generator) -> Li
 
 ### 6.5 Triple Crown Consistency
 Specialist must pass stress tests across **3+ challenge variations** (different Re, geometries, coupling strengths).
+
+### 6.6 Symbolic Gauntlet (NEW)
+- Verify symbolic metadata preserved in distillation
+- Verify CUDA codegen produces valid kernels
+- Verify symbolic metadata matches teacher ensemble
+- Verify validity domain matches teacher ensemble
 
 ---
 
@@ -403,6 +444,8 @@ message StrategyFragment {
   uint64 timestamp = 10;
   repeated string causal_parents = 11;
   map<string, float> param_values = 12;
+  // NEW: Symbolic features extracted from config
+  map<string, float> symbolic_features = 13;
 }
 
 message UQMetrics {
@@ -413,39 +456,80 @@ message UQMetrics {
 }
 ```
 
-### 7.2 Daily Causal Update (DML)
+### 7.2 Daily Causal Update (DML) — ENHANCED WITH SYMBOLIC
 ```python
 def daily_causal_update(new_fragments: List[StrategyFragment]):
     dag.add_nodes(new_fragments)
+    
+    # ENRICH FRAGMENTS WITH SYMBOLIC FEATURES
+    for fragment in new_fragments:
+        fragment.symbolic_features = extract_symbolic_features(fragment.config_json)
+    
     for problem_id in PROBLEM_FAMILIES:
         problem_fragments = dag.get_problem_fragments(problem_id)
+        
+        # Double Machine Learning for heterogeneous treatment effects
+        # Y = improvement, T = config_param, X = other_params + problem_context + SYMBOLIC_FEATURES
         dml = DoubleML(
-            model_y=RandomForestRegressor(),
-            model_t=RandomForestRegressor(),
+            model_y=HistGradientBoostingRegressor(),  # Faster, incremental
+            model_t=HistGradientBoostingRegressor(),
             n_folds=5
         )
         dml.fit(problem_fragments)
-        effects = {param: dml.ate(param) for param in TUNABLE_PARAMS}
+        
+        # Estimate ATE for each tunable parameter
+        effects = {}
+        for param in TUNABLE_PARAMS:
+            effects[param] = dml.ate(param)
+        
+        # Conditional effects: "fourier_modes helps when physics_loss > 1.0"
         interactions = dml.interaction_effects()
+        
+        # Propose baseline update
         proposal = propose_baseline(effects, interactions, current_baseline)
         owner_review_queue.put(proposal)
 ```
 
-### 7.3 Weekly Specialist Distillation (Team-Side)
+### 7.3 Weekly Specialist Distillation (Team-Side) — WITH SYMBOLIC GAUNTLET
 ```python
 def weekly_distillation():
     for problem_id in PROBLEM_FAMILIES:
+        # 1. Select top-K fragments (score > 90th percentile, stress_passed)
         teachers = select_top_fragments(problem_id, k=5)
+        
+        # 2. Distill into student (same backbone, 50% width)
         student = distill_ensemble(
             teachers=teachers,
             student_config=StudentConfig(width_factor=0.5),
             loss_fn=DistillationLoss(
-                alpha_output=1.0, alpha_physics=0.5, alpha_features=0.3, alpha_uq=0.2
+                alpha_output=1.0,      # Output MSE
+                alpha_physics=0.5,     # Physics loss on student
+                alpha_features=0.3,    # Feature matching
+                alpha_uq=0.2,          # UQ matching
+                alpha_symbolic=0.2     # NEW: preserve symbolic metadata
             ),
             data=load_problem_data(problem_id)
         )
-        if pass_specialist_gauntlet(student, problem_id):
-            specialist_bank.publish(Specialist(...))
+        
+        # Regression test: specialist must pass same stress tests
+        stress_result = run_stress_test(student, get_stress_data(problem_id))
+        if stress_result.hard_failure:
+            log_failure("Distilled specialist failed stress test")
+            continue
+        
+        # SYMBOLIC GAUNTLET
+        if pass_symbolic_gauntlet(student, problem_id):
+            specialist = Specialist(
+                specialist_id=f"{problem_id}_v{version}",
+                onnx_model=export_onnx(student),
+                problem_signature=get_signature(problem_id),
+                metrics=evaluate_full(student, problem_id),
+                validity_domain=estimate_validity_domain(student),
+                symbolic_metadata=extract_symbolic_metadata(teachers),  # NEW
+                cuda_kernel=generate_cuda_kernel(student),  # NEW: MTK → CUDA
+                license="AGPL-3.0 + Commercial Dual-License"
+            )
+            specialist_bank.publish(specialist)
 ```
 
 ### 7.4 Landscape Treasury & Governance
@@ -469,6 +553,19 @@ message Specialist {
   License license = 6;
   uint64 created_at = 7;
   string distilled_from = 8;
+  // NEW: Symbolic metadata
+  SpecialistSymbolicMetadata symbolic_metadata = 9;
+  bytes cuda_kernel = 10;  // MTK → CUDA codegen
+}
+
+message SpecialistSymbolicMetadata {
+  string governing_pde = 1;
+  repeated string symmetries = 2;
+  repeated string conservation_laws = 2;
+  ValidityDomain validity_domain = 3;
+  repeated string symmetry_features = 4;
+  repeated string conservation_features = 5;
+  repeated string boundary_types_supported = 6;
 }
 ```
 
@@ -499,8 +596,8 @@ GET  /api/v1/submissions/{submission_id}
 ```
 
 #### 8.4.2 Submission Payloads
-**Phase 0-1:** `{"challenge_id": "...", "hotkey": "...", "strategy": {...}}`  
-**Phase 2+:** `{"challenge_id": "...", "hotkey": "...", "specialist_pipeline": {...}}`
+**Phase 0-1 (Strategy JSON):** `{"challenge_id": "...", "hotkey": "...", "strategy": {...}}`  
+**Phase 2+ (Specialist Pipeline):** `{"challenge_id": "...", "hotkey": "...", "specialist_pipeline": {...}}`
 
 #### 8.4.3 Structured Feedback Response
 ```json
@@ -511,6 +608,7 @@ GET  /api/v1/submissions/{submission_id}
   "score": 0.047,
   "improvement_vs_baseline": 0.012,
   "novelty_bonus": 0.005,
+  "symbolic_bonus": 0.02,
   "emission_reward": 124.5,
   "physics_gates": { ... },
   "stress_test_summary": { ... },
@@ -539,6 +637,7 @@ result = client.submit(strategy)
 - **Backbone:** FNO/PINO hybrid (spectral + local kernels)
 - **Width:** 128 channels, 6 spectral blocks
 - **Conditioning:** ProblemSignature → FiLM layers modulate backbone
+- **NEW:** SymbolicMetadata → FiLM layers modulate backbone
 - **UQ:** Built-in evidential head (μ, σ, ν, α for Student-t)
 
 ### 9.2 Training
@@ -598,6 +697,8 @@ challenge_budget = total_subnet_emission / min(active_challenges, 10)
 
 **Novelty Bonus:** 5% of challenge budget for physics-informed embedding distance from recent winners, **only if improvement > 0**.
 
+**Symbolic Bonus:** 2% of challenge budget for using auto-generated symbolic features that improve baseline by >5%.
+
 **Bounty Accumulation:** Emissions pool until improvement > 0.
 
 **Private-until-proven:** Strategies revealed only after earning rewards.
@@ -605,7 +706,7 @@ challenge_budget = total_subnet_emission / min(active_challenges, 10)
 **Miner burn:** 0%
 
 **Warm-up (<10 distinct submissions/challenge):** Top 3 split 50/30/20 (only if improvement > 0).  
-**Competitive:** Top-4 split (40/30/20/10) + novelty bonus (5%, improvement-gated).
+**Competitive:** Top-4 split (40/30/20/10) + novelty bonus (5%, improvement-gated) + symbolic bonus (2%, improvement >5%).
 
 **Validators (41%):** Paid per validation via median consensus scoring completeness + physics-check audit.
 
@@ -624,6 +725,12 @@ challenge_budget = total_subnet_emission / min(active_challenges, 10)
 
 **Revenue:** $2-5M/yr licensing causal knowledge graph.
 
+**Symbolic Milestones:**
+- [ ] ModelingToolkit integration in validator pipeline
+- [ ] Symbolic feature extraction per challenge (symmetries, conservation, dimless groups)
+- [ ] Automatic loss weight computation from symbolic metadata
+- [ ] Symbolic-aware physics gates
+
 ### Phase 1: Specialist Bank & Data Markets (Months 3-6)
 **Challenges:** Same 7 problems. Miners add LoRA adapters and custom datasets.
 
@@ -633,14 +740,32 @@ challenge_budget = total_subnet_emission / min(active_challenges, 10)
 
 **Revenue:** $10-50M/yr specialist licensing, data royalties, fine-tuning API.
 
+**Symbolic Milestones:**
+- [ ] Specialist distillation with symbolic metadata preservation
+- [ ] Symbolic metadata extraction from teacher ensemble
+- [ ] Symbolic metadata attached to distilled specialists
+- [ ] Symbolic regression (DataDrivenDiffEq) for PDE discovery
+
 ### Phase 2: Composition Engine & Specialist Marketplace (Months 6-18)
-**Phase 2A (Months 6-9):** FSI (Turek/Hron) + CHT (PDEBench) — verified benchmarks only  
-**Phase 2B (Month 9):** Thermo-elasticity (48 Tier-1 refs generated)  
-**Phase 2C (Months 10-14):** Variant expansion + Go/No-Go gate for 3D
+**Phase 2A (Months 1-3): Verified Benchmarks Only**
+| Challenge | Source | Physics | Specialist Pair |
+|-----------|--------|---------|-----------------|
+| FSI 2D-1/2/3 | Turek/Hron | Fluid-Structure Interaction | `ns_2d` + `elasticity_2d` + `fsi_coupling` |
+| CHT: Solid cooling / Electronics | PDEBench | Conjugate Heat Transfer | `ns_2d` + `heat_2d` + `cht_coupling` |
+
+**Phase 2B (Month 3):** Thermo-Elasticity. Generate 48 Tier-1 references (β×κ×geometry) at 256² with FEniCS monolithic, mesh-converged. Cost: ~$3K.
+
+**Phase 2C (Months 4-5):** Variant expansion (new Re, geometries, coupling strengths) on FSI/CHT/thermo-elasticity using existing references.
 
 **Product:** Proven composition > monolith. Specialist Bank (50+ specialists) composable via adapters. Data royalty market.
 
 **Revenue:** $50-200M/yr composition engine licensing, custom pipelines, marketplace fees.
+
+**Symbolic Milestones:**
+- [ ] Symbolic Composition: Acausal specialist composition via MTK
+- [ ] Symbolic metadata enables automatic compatibility checking
+- [ ] Acausal composition → auto-generates coupled PDEs
+- [ ] Symbolic Composition track in leaderboard
 
 ### Phase 3: 3D Transition & Foundation Operator (Months 18+)
 
@@ -667,6 +792,13 @@ Multi-teacher distillation across entire Specialist Bank (2D + 3D). FiLM conditi
 
 **Revenue:** $1B+ TAM. Foundation Operator API, custom surrogates, enterprise physics infrastructure.
 
+**Symbolic Milestones:**
+- [ ] Multi-teacher distillation across entire Specialist Bank (2D + 3D)
+- [ ] FiLM conditioning on ProblemSignature + SymbolicMetadata
+- [ ] Evidential UQ head (μ, σ, ν, α for Student-t)
+- [ ] Commercial fine-tuning API: TEE decryption → LoRA rank=8 (10-50 steps) → stress test verification → encrypted ONNX return
+- [ ] LPM fine-tuning API commercial launch
+
 ---
 
 ## 13. Implementation Checklist
@@ -680,6 +812,12 @@ Multi-teacher distillation across entire Specialist Bank (2D + 3D). FiLM conditi
 - [ ] Landscape Agent: fragment store, DML causal inference, daily baseline proposer
 - [ ] Dashboard: live leaderboard, fragment explorer, causal graph
 
+**Symbolic Milestones:**
+- [ ] ModelingToolkit integration in validator pipeline
+- [ ] Symbolic feature extraction per challenge (symmetries, conservation, dimless groups)
+- [ ] Automatic loss weight computation from symbolic metadata
+- [ ] Symbolic-aware physics gates
+
 ### Phase 1: Specialist Bank & Data Markets (Months 3-6)
 - [ ] LoRA adapter support in validator (rank-4-8, target layer selection)
 - [ ] Custom data ingestion + caching + data royalty pool (5% of emissions)
@@ -687,6 +825,12 @@ Multi-teacher distillation across entire Specialist Bank (2D + 3D). FiLM conditi
 - [ ] Dual-license legal framework (AGPL-3.0 + Commercial)
 - [ ] Specialist Bank on-chain registry (specialist_id, onnx_model, validity_domain, license)
 - [ ] Miner CLI: `custom_data` submission, `uq_config` support
+
+**Symbolic Milestones:**
+- [ ] Specialist distillation with symbolic metadata preservation
+- [ ] Symbolic metadata extraction from teacher ensemble
+- [ ] Symbolic metadata attached to distilled specialists
+- [ ] Symbolic regression (DataDrivenDiffEq) for PDE discovery
 
 ### Phase 2: Composition Engine & Specialist Marketplace (Months 6-18)
 **Phase 2A (Months 6-9): Verified Benchmarks**
@@ -706,6 +850,12 @@ Multi-teacher distillation across entire Specialist Bank (2D + 3D). FiLM conditi
 - [ ] Composition win rate >60% on multi-physics challenges
 - [ ] Adapter innovation >30% (novel coupling adapters)
 - [ ] Go/No-Go gate evaluation for 3D transition
+
+**Symbolic Milestones:**
+- [ ] Symbolic Composition: Acausal specialist composition via MTK
+- [ ] Symbolic metadata enables automatic compatibility checking
+- [ ] Acausal composition → auto-generates coupled PDEs
+- [ ] Symbolic Composition track in leaderboard
 
 ### Phase 2C Exit Criteria (Go/No-Go for 3D Transition)
 | Metric | Target | If Missed |
@@ -756,6 +906,13 @@ Multi-teacher distillation across entire Specialist Bank (2D + 3D). FiLM conditi
 **Phase 3.3: Foundation Operator (LPM)**
 - [ ] Multi-teacher distillation across entire Specialist Bank (2D + 3D)
 - [ ] FiLM conditioning on ProblemSignature
+- [ ] Evidential UQ head (μ, σ, ν, α for Student-t)
+- [ ] Commercial fine-tuning API: TEE decryption → LoRA rank=8 (10-50 steps) → stress test verification → encrypted ONNX return
+- [ ] LPM fine-tuning API commercial launch
+
+**Symbolic Milestones:**
+- [ ] Multi-teacher distillation across entire Specialist Bank (2D + 3D)
+- [ ] FiLM conditioning on ProblemSignature + SymbolicMetadata
 - [ ] Evidential UQ head (μ, σ, ν, α for Student-t)
 - [ ] Commercial fine-tuning API: TEE decryption → LoRA rank=8 (10-50 steps) → stress test verification → encrypted ONNX return
 - [ ] LPM fine-tuning API commercial launch
@@ -825,6 +982,54 @@ def get_phase_targets(phase):
     else: return {"uq_target": 0.99, "rollout_steps": 1000}
 ```
 
+### 14.8 Symbolic Layer Mathematical Definitions
+
+#### 14.8.1 Symbolic PDE Representation
+```
+Given PDE: ∂u/∂t + ∇·(u⊗u) = -∇p + ν∇²u + f
+Symbolic representation: ODESystem(eqs, t, states, params)
+where eqs = [D(u,t) + ∇·(u⊗u) + ∇p - ν∇²u - f, ∇·u]
+```
+
+#### 14.8.2 Feature Extraction Mapping
+```
+Φ: ODESystem → FeatureDict
+Φ(sys) = {
+  symmetries: detect_symmetries(sys),
+  conservation_laws: detect_conservation_laws(sys),
+  dimensionless_groups: extract_dimensionless_groups(sys),
+  boundary_conditions: extract_boundary_conditions(sys),
+  coupling_terms: extract_coupling_terms(sys)
+}
+```
+
+#### 14.8.3 Symbolic Regression (PDE Discovery)
+```
+Given: trajectories {u(x,t)}, basis functions B = {u, u_x, u_xx, u*u_x, ...}
+Find: sparse coefficients ξ such that ∂u/∂t ≈ B·ξ
+Method: STLSQ (Sequential Thresholded Least Squares)
+Objective: min ‖∂u/∂t - B·ξ‖₂ + λ‖ξ‖₁
+```
+
+#### 14.8.4 Symbolic Distillation Loss
+```
+L_distill = α·MSE(student, teacher_ensemble) 
+          + β·PhysicsLoss(student) 
+          + γ·FeatureMatching(student, teachers)
+          + δ·UQ_Calibration_Loss
+          + ε·SymbolicLoss(student, teachers)  // NEW
+          
+SymbolicLoss = ‖Φ(student) - Φ(teacher_ensemble)‖₂²
+where Φ extracts symbolic features from model predictions
+```
+
+#### 14.8.5 Phase-Gated UQ & Rollout
+```
+Phase 0-1: UQ target 90%, rollout 100 steps
+Phase 2:   UQ target 95%, rollout 100 steps  
+Phase 3:   UQ target 99%, rollout 1000 steps + spectral stationarity
+```
+
 ---
 
-*End of SPEC.md v2.1*
+*End of SPEC.md v2.2*
