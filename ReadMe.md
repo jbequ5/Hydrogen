@@ -22,9 +22,7 @@ A surrogate trained on MSE minimizes MSE. It doesn't know ∇·u = 0 is a law, n
 
 ## The Tribal Knowledge Trap
 
-The field knows this. Every paper proposes a new physics-informed loss, a new architecture tweak, a new training trick.
-
-But discoveries stay tribal.
+The field knows this. Every paper proposes a new physics-informed loss, a new architecture tweak, a new training trick, but discoveries stay tribal.
 
 The PhD who discovers that *curriculum learning + ghost-cell boundaries + physics loss weight 1.8* works for transonic flow publishes a paper. Two years later, a team at another institution rediscovers it. Another PhD finds that Fourier modes scale with dimension as N^(d/2). Another learns that curriculum learning only helps when start resolution ≤ 0.5× end resolution.
 
@@ -36,19 +34,21 @@ We don't need better neural operators. We need a system that **compounds knowled
 
 ## The Foundation
 
-We are not building neural operators from scratch. We are building on two mature, production-grade foundations:
+We are not building neural operators from scratch. We are building on three mature, production-grade foundations:
 
 **PhysicsNeMo** (NVIDIA) provides the reference implementations: FNO, PINO, DeepONet, GNO, OFormer with built-in physics-informed losses, conservation constraints, spectral layers, boundary handling, and UQ tooling. It is the PyTorch of physics-informed neural operators—battle-tested in industrial deployments from climate modeling to semiconductor design.
 
 **NeuralOperator** (the library behind the Berner et al. Nature paper) provides the mathematical backbone: the layer conversions that make standard architectures discretization-agnostic, the quadrature weights that preserve conservation, the spectral and graph operator implementations. It is the reference implementation of the theory.
 
+**Julia & the SciML Ecosystem** — The mathematical backbone for the symbolic layer. The Julia Lab at MIT built the SciML ecosystem: DifferentialEquations.jl, ModelingToolkit.jl, NeuralPDE.jl, NeuralOperators.jl, DataDrivenDiffEq.jl. This is the symbolic mathematics engine that lets us parse PDEs into abstract syntax trees, extract symmetries and conservation laws automatically, discover governing equations from data, and generate deployable CUDA/VHDL/Rust code from symbolic models. 
+
 Hydrogen wraps these libraries in pinned, versioned Docker images. Validators pull `hydrogen/validator:pino-v24.09` and get exactly the same PhysicsNeMo + NeuralOperator + PyTorch + CUDA stack every time. Miners never install dependencies. They only tune the knobs these libraries already expose.
 
-We are not inventing the engine. We are building the **race track, the timing system, and the engineering team that learns from every lap.**
+**We are not inventing the engine. We are building the race track, the timing system, and the engineering team that learns from every lap.**
 
 ---
 
-## The Symbolic Layer: Physics-Aware Intelligence
+## The Symbolic Layer: Giving Neural Operators a Physics Brain
 
 Hydrogen integrates **ModelingToolkit.jl** (Julia's symbolic modeling framework) as a **symbolic preprocessing and reasoning layer** that sits between challenge definition and neural operator training.
 
@@ -70,7 +70,7 @@ Hydrogen integrates **ModelingToolkit.jl** (Julia's symbolic modeling framework)
 Challenge → Symbolic Layer → Miner Strategy → Validator → Landscape Agent → Specialist Bank
                 ↑                    ↑              ↑              ↑              ↑
            PDE → AST          Auto loss      Physics gates   PDE discovery   ONNX + sym.
-             → AST            weights          + sym.          → new challenges   metadata + CUDA
+                                weights          + sym.    → new challenges    metadata + CUDA
 ```
 
 | Stage | Symbolic Layer Action | Value to Hydrogen |
@@ -99,6 +99,35 @@ Bittensor provides the economic substrate where **verified improvement is the on
 
 ---
 
+## The Hydrogen Insight: A Market, Not a Model
+We don't need a better neural operator. We need a system that compounds knowledge about how to train them.
+
+Hydrogen is a Bittensor subnet that turns the sim-to-real gap into a compounding physical knowledge economy.
+
+┌─────────────────────────────────────────────────────────────────┐
+│                        HYDROGEN ARCHITECTURE                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   MINERS                                                        │
+│   Submit strategy JSONs (backbone, loss weights, curriculum)    │
+│   Pay fee • No GPU needed • Never upload weights                │
+│          │                                                      │
+│          ▼                                                      │
+│   VALIDATORS                                                    │
+│   Pinned Docker • Train on public split • Hidden stress test    │
+│   Hard physics gates (mass, energy, UQ) → binary pass/fail      │
+│          │                                                      │
+│          ▼                                                      │
+│   LANDSCAPE AGENT                                               │
+│   Double ML on fragment DAG → Causal effects → New baselines    │
+│   Distills winners → ONNX specialists → Specialist Bank         │
+│          │                                                      │
+│          ▼                                                      │
+│   SPECIALIST BANK                                               │
+│   Composable ONNX specialists + symbolic metadata + CUDA code   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
 ## The Mechanism
 
 **Open challenges.** A set of challenges is open for competition at any time. Each challenge defines a PDE problem with a public training split, a public holdout set, and a **hidden stress test** generated procedurally from the challenge ID (shifted Reynolds numbers, resolutions, geometries, forcing). No miner has ever seen the stress test.
@@ -114,7 +143,7 @@ Bittensor provides the economic substrate where **verified improvement is the on
 
 Hard failure = score zero. Physics is binary.
 
-**Score = log(E_baseline) - log(E_submission).** Improvement measured in log-space against the current baseline. Median of five validators determines the ranking.
+**Score = log(E_baseline) - log(E_submission).** Improvement measured in log-space against the current baseline.
 
 **Emission distribution per challenge.** Each challenge has an emission budget. The top 4 ranked miners split that challenge's emission budget: **40% / 30% / 20% / 10%**. Winner takes 40%, 2nd takes 30%, 3rd takes 20%, 4th takes 10%. Ranks 5+ receive zero emissions for that challenge.
 
@@ -437,3 +466,23 @@ Each specialist deployed to edge carries symbolic metadata ensuring physics comp
 **The product is real at Phase 1. Scalable at Phase 2. Transformative at Phase 3.**
 
 *Hydrogen: Where every training run teaches the network. Where physics is the only metric that pays. Where the sim-to-real gap becomes a shrinking, measured, attributable quantity. Where physics-compliant surrogates reach the edge.*
+
+## Docs
+
+Technical Specification	SPEC.md
+
+Roadmap & Milestones	ROADMAP.md
+
+Agent Specification	AGENT_SPEC.md
+
+Validator Runtime	Appendix B
+
+Miner CLI	Appendix C
+
+Dashboard & Indexer	Appendix D
+
+Local Dev Environment	Appendix E
+
+Testing & CI/CD	Appendix F
+
+Operational Runbook	Appendix G
