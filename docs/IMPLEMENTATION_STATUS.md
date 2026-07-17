@@ -1,29 +1,33 @@
 # Implementation Status (Updated July 17, 2026)
 
 **Docs cleanup** ✓
-**Scaffolding** ✓
-**Step 1 (Poisson loader + local_validate)** ✓
+**Scaffolding + integration** ✓
+**Step 1 (challenge loader)** ✓
+**Step 2 (validator core)** ✓
 
-**This update (Step 2)**:
-- `neurons/validator.py` now has a **working scientific core**:
-  - `validate_submission(challenge_id, strategy)` — full pipeline
-  - `ValidationResult` dataclass (clean output for consensus/Landscape)
-  - Integrated `hydrogen.challenges.poisson_2d` + `hydrogen.physics.gates`
-  - `dummy_physics_neural_operator_forward` (clear TODO for real PhysicsNeMo training)
-  - `forward()` hook ready for Bittensor Synapse
-  - Standalone `main()` demo that runs the full validator logic without needing the network
+**This update (Real PhysicsNeMo training)**:
+- New module: `hydrogen/training/physicsnemo_trainer.py`
+  - `train_physics_neural_operator()` — actual small FNO training using PhysicsNeMo
+  - Uses loss weights directly from miner strategy
+  - Includes simple physics residual term + boundary loss
+  - Graceful fallback to dummy if `physicsnemo` not installed
+- Updated `neurons/validator.py` to call the real trainer by default
+- `main()` now supports `--real` flag to force PhysicsNeMo path
 
-**How to run the validator core now**:
+**How to run with real training** (inside Docker image or after `pip install physicsnemo`):
 ```bash
-python neurons/validator.py --challenge poisson_2d_v1 --noise 0.012
+python neurons/validator.py --challenge poisson_2d_v1 --real
 ```
 
-You get a full `ValidationResult` with score, improvement, gate breakdown, etc.
+**Note**: Training is deliberately short (6 epochs) for fast iteration in MVP.
+In production validator, increase epochs + use proper PhysicsNeMo PDE losses.
 
-**Progress summary**:
-We now have a complete runnable prototype of the core loop:
-Challenge → Strategy → Forward (stub) → Gates → Score + Structured Result
+**Current state**: We have a working end-to-end prototype with real model training + physics gates.
 
-**Next recommended**: Add a simple Landscape script (fragment storage + baseline update) or start wiring real PhysicsNeMo training into the dummy forward.
+**Next logical steps**:
+- Simple Landscape agent (fragment storage + baseline proposer)
+- Better UQ and soft penalties in scoring
+- Expand to Darcy + Burgers challenges
+- Miner CLI with local dry-run
 
-Old duplicated files (Sepc.md, ReadMe.md) can be deleted for cleanliness.
+Old duplicated files can be removed now.
