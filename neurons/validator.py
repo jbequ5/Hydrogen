@@ -1,4 +1,8 @@
-"""Hydrogen Validator with full multi-challenge support including Navier-Stokes."""
+"""Hydrogen Validator with benchmark-aware scoring.
+
+Now loads challenges with real PDEBench data when available,
+so miners are scored against high-quality reference solutions.
+"""
 
 import time
 import numpy as np
@@ -23,10 +27,11 @@ class Validator(BaseValidatorNeuron):
             "elasticity_2d_v1",
             "ns_2d_laminar_v1",
         ]
-        bt.logging.info("Hydrogen Validator with broad coverage including Navier-Stokes 2D laminar.")
+        self.use_benchmark = True  # Prefer real benchmark data when available
+        bt.logging.info("Hydrogen Validator initialized with benchmark-aware scoring.")
 
     async def forward(self):
-        bt.logging.info("Starting validation round...")
+        bt.logging.info("Starting validation round (benchmark mode)...")
 
         challenge_id = self.challenge_ids[self.current_challenge_index]
         self.current_challenge_index = (self.current_challenge_index + 1) % len(self.challenge_ids)
@@ -109,11 +114,15 @@ class Validator(BaseValidatorNeuron):
         from hydrogen.physics.gates import evaluate_all_gates, compute_relative_l2_error
         from hydrogen.training.physicsnemo_trainer import train_physics_neural_operator
 
-        challenge = load_challenge(challenge_id)
+        # Load with benchmark data when available (critical for meaningful scoring)
+        challenge = load_challenge(challenge_id, use_benchmark=self.use_benchmark)
         baseline_error = challenge.baseline_error
+
+        bt.logging.info(f"Validating on {challenge_id} (data_source={challenge.data_source})")
 
         results = train_physics_neural_operator(challenge, strategy, epochs=6)
 
+        # Determine pde_type
         if "ns_2d" in challenge_id or "navier" in challenge_id:
             pde_type = "navier_stokes"
         elif "burgers" in challenge_id:
@@ -132,11 +141,17 @@ class Validator(BaseValidatorNeuron):
         if not hard_pass:
             return {"score": 0.0, "improvement": 0.0, "hard_pass": False}
 
-        u_key = list(challenge.stress_data.keys())[0]
+        # Flexible field access for benchmark vs synthetic data
+        u_key = next(
+            (k for k in ["u_true", "velocity_true", "ux_true", "u"] if k in challenge.stress_data),
+            list(challenge.stress_data.keys())[0]
+        )
         u_true = challenge.stress_data[u_key][0]
-        if u_true.dim() == 3:  # vector field
+        u_pred = results.get("u_pred", results.get("velocity_pred", torch.zeros_like(u_true)))
+
+        if u_true.dim() == 3:  # vector field (e.g. NS velocity)
             u_true = u_true[0]
-        u_pred = results.get("u_pred", torch.zeros_like(u_true))
+
         submission_error = compute_relative_l2_error(u_pred, u_true)
         improvement = float(torch.log(torch.tensor(baseline_error)) - torch.log(torch.tensor(submission_error)))
 
@@ -144,11 +159,12 @@ class Validator(BaseValidatorNeuron):
             "score": max(0.0, improvement),
             "improvement": improvement,
             "hard_pass": True,
+            "data_source": challenge.data_source,
         }
 
 
 if __name__ == "__main__":
     with Validator() as validator:
         while True:
-            bt.logging.info("Hydrogen Validator running...")
+            bt.logging.info("Hydrogen Validator running (benchmark mode)...")
             time.sleep(30)
