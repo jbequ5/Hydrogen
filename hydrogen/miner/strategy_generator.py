@@ -1,10 +1,6 @@
-"""Strategy generation + local validation for Hydrogen miners.
-
-Local validation now supports real (short) PhysicsNeMo training for more accurate scoring.
-"""
+"""Strategy generation now supports multiple challenges."""
 
 from typing import Dict, Any, Tuple
-
 import torch
 
 try:
@@ -13,14 +9,11 @@ try:
 except ImportError:
     PHYSICSNEMO_AVAILABLE = False
 
-from hydrogen.challenges.poisson_2d import load_challenge
+from hydrogen.challenges import load_challenge
 from hydrogen.physics.gates import evaluate_all_gates, compute_relative_l2_error
 
 
 def generate_strategy(challenge_id: str = "poisson_2d_v1") -> Dict[str, Any]:
-    """
-    Generate a strategy using symbolic metadata from the challenge.
-    """
     try:
         challenge = load_challenge(challenge_id)
         symbolic = challenge.symbolic_metadata
@@ -30,7 +23,7 @@ def generate_strategy(challenge_id: str = "poisson_2d_v1") -> Dict[str, Any]:
 
     return {
         "backbone": "PINO",
-        "resolution": [128, 128],
+        "resolution": list(challenge.resolution) if hasattr(challenge, 'resolution') else [128, 128],
         "pino": {
             "loss_vector": suggested_weights,
             "physics_loss_type": "pde_residual",
@@ -60,25 +53,12 @@ def get_local_validation_score(
     use_real_training: bool = False,
     quick_epochs: int = 4,
 ) -> Tuple[float, bool, Dict[str, Any]]:
-    """
-    Perform local validation of a strategy.
-
-    If use_real_training=True and PhysicsNeMo is available, it will run a short
-    training loop (quick_epochs) then evaluate gates. Otherwise falls back to
-    simulated prediction.
-
-    Returns: (improvement, hard_pass, gate_details)
-    """
     try:
         challenge = load_challenge(challenge_id)
 
         if use_real_training and PHYSICSNEMO_AVAILABLE:
-            # Real short training for better validation
-            results = train_physics_neural_operator(
-                challenge, strategy, epochs=quick_epochs
-            )
+            results = train_physics_neural_operator(challenge, strategy, epochs=quick_epochs)
         else:
-            # Simulated / lightweight prediction
             stress = challenge.stress_data
             u_true = stress["u_true"][0]
             noise_level = strategy.get("noise_level", 0.012)
@@ -94,7 +74,9 @@ def get_local_validation_score(
                 "dE_dt": torch.tensor([-0.0002]),
             }
 
-        hard_pass, gate_details = evaluate_all_gates(results, pde_type="poisson")
+        # Determine pde_type for gates
+        pde_type = "poisson" if "poisson" in challenge_id else "darcy"
+        hard_pass, gate_details = evaluate_all_gates(results, pde_type=pde_type)
 
         submission_error = compute_relative_l2_error(results["u_pred"], challenge.stress_data["u_true"][0])
         baseline_error = challenge.baseline_error

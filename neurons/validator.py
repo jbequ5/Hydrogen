@@ -1,8 +1,4 @@
-"""Hydrogen Validator with sophisticated per-challenge aware weight setting.
-
-Weights are now more aligned with the spec: top performers on challenges
-get stronger influence, and only miners beating baseline contribute meaningfully.
-"""
+"""Hydrogen Validator now supports multiple challenges."""
 
 import time
 import numpy as np
@@ -10,20 +6,25 @@ import bittensor as bt
 
 from hydrogen.base.validator import BaseValidatorNeuron
 from hydrogen.protocol import StrategySynapse
+from hydrogen.challenges import load_challenge
 
 
 class Validator(BaseValidatorNeuron):
     def __init__(self, config=None):
         super().__init__(config=config)
-        self.scores = {}           # hotkey -> moving average score
-        self.challenge_history = {}  # hotkey -> list of recent improvements
+        self.scores = {}
+        self.challenge_history = {}
         self.moving_average_alpha = 0.15
-        bt.logging.info("Hydrogen Validator initialized with per-challenge aware weighting.")
+        self.current_challenge_index = 0
+        self.challenge_ids = ["poisson_2d_v1", "darcy_2d_v1"]
+        bt.logging.info("Hydrogen Validator initialized with multi-challenge support.")
 
     async def forward(self):
         bt.logging.info("Starting validation round...")
 
-        challenge_id = "poisson_2d_v1"
+        # Cycle through challenges
+        challenge_id = self.challenge_ids[self.current_challenge_index]
+        self.current_challenge_index = (self.current_challenge_index + 1) % len(self.challenge_ids)
 
         axons = [a for a in self.metagraph.axons if a.hotkey != self.wallet.hotkey.ss58_address]
         if not axons:
@@ -48,50 +49,38 @@ class Validator(BaseValidatorNeuron):
             if hotkey and validation.get("hard_pass"):
                 score = validation["score"]
                 improvement = validation.get("improvement", 0.0)
-
                 round_scores[hotkey] = score
                 improvements.append((hotkey, improvement))
 
-                bt.logging.info(f"{hotkey[:8]}: score={score:.4f}, improvement={improvement:+.4f}")
+                bt.logging.info(f"{hotkey[:8]} on {challenge_id}: score={score:.4f}, improvement={improvement:+.4f}")
 
-        # Update scores with per-challenge awareness
         self._update_scores(round_scores, improvements)
 
         if self.scores:
             self._set_weights()
 
     def _update_scores(self, round_scores: dict, improvements: list):
-        """Update scores with emphasis on recent strong challenge performance."""
         for hotkey, score in round_scores.items():
             if hotkey in self.scores:
-                self.scores[hotkey] = (
-                    (1 - self.moving_average_alpha) * self.scores[hotkey] +
-                    self.moving_average_alpha * score
-                )
+                self.scores[hotkey] = (1 - self.moving_average_alpha) * self.scores[hotkey] + self.moving_average_alpha * score
             else:
                 self.scores[hotkey] = score
 
-        # Bonus for top performers this round (closer to spec's top-4 emphasis)
         if improvements:
             sorted_improvements = sorted(improvements, key=lambda x: x[1], reverse=True)
-            top_k = sorted_improvements[:4]  # Top 4 get extra weight influence
-
+            top_k = sorted_improvements[:4]
             for hotkey, improvement in top_k:
-                if improvement > 0:  # Only reward those who beat baseline
-                    if hotkey in self.scores:
-                        self.scores[hotkey] *= 1.15  # Boost top performers
+                if improvement > 0 and hotkey in self.scores:
+                    self.scores[hotkey] *= 1.15
 
     def _set_weights(self):
-        """Set weights with bias toward consistent + recent top performers."""
         try:
             hotkeys = []
             weights = []
-
             for hotkey, score in self.scores.items():
                 if hotkey in self.metagraph.hotkeys:
                     uid = self.metagraph.hotkeys.index(hotkey)
                     hotkeys.append(uid)
-                    # Only give meaningful weight to miners who have shown positive improvement
                     weights.append(max(0.01, score))
 
             if not hotkeys:
@@ -112,7 +101,6 @@ class Validator(BaseValidatorNeuron):
             bt.logging.error(f"Weight setting failed: {e}")
 
     def validate_submission(self, challenge_id: str, strategy: dict):
-        from hydrogen.challenges.poisson_2d import load_challenge
         from hydrogen.physics.gates import evaluate_all_gates, compute_relative_l2_error
         from hydrogen.training.physicsnemo_trainer import train_physics_neural_operator
 
@@ -120,7 +108,9 @@ class Validator(BaseValidatorNeuron):
         baseline_error = challenge.baseline_error
 
         results = train_physics_neural_operator(challenge, strategy, epochs=6)
-        hard_pass, gate_details = evaluate_all_gates(results, pde_type="poisson")
+
+        pde_type = "poisson" if "poisson" in challenge_id else "darcy"
+        hard_pass, gate_details = evaluate_all_gates(results, pde_type=pde_type)
 
         if not hard_pass:
             return {"score": 0.0, "improvement": 0.0, "hard_pass": False}
@@ -134,7 +124,6 @@ class Validator(BaseValidatorNeuron):
             "score": max(0.0, improvement),
             "improvement": improvement,
             "hard_pass": True,
-            "gate_details": gate_details,
         }
 
 

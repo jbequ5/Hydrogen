@@ -1,3 +1,17 @@
-"""Challenge loading and pre-computed symbolic metadata (Phase 0)."""
+"""Challenge registry for Hydrogen.
 
-# TODO: load_challenge(challenge_id) -> (train, holdout, stress, symbolic_metadata)
+Allows dynamic loading of different PDE challenges.
+"""
+
+from .poisson_2d import load_challenge as load_poisson
+from .darcy_2d import load_challenge as load_darcy
+
+CHALLENGE_LOADERS = {
+    "poisson_2d_v1": load_poisson,
+    "darcy_2d_v1": load_darcy,
+}
+
+def load_challenge(challenge_id: str):
+    if challenge_id not in CHALLENGE_LOADERS:
+        raise ValueError(f"Unknown challenge: {challenge_id}")
+    return CHALLENGE_LOADERS[challenge_id](challenge_id)
