@@ -1,23 +1,29 @@
 # Implementation Status (Updated July 17, 2026)
 
-**Docs cleanup** ✓ (clean README + consolidated SPEC + notes)
+**Docs cleanup** ✓
+**Scaffolding** ✓
+**Step 1 (Poisson loader + local_validate)** ✓
 
-**Code scaffolding** ✓
-- Package structure, physics gates (full impl), neuron skeletons, Dockerfile, CI
+**This update (Step 2)**:
+- `neurons/validator.py` now has a **working scientific core**:
+  - `validate_submission(challenge_id, strategy)` — full pipeline
+  - `ValidationResult` dataclass (clean output for consensus/Landscape)
+  - Integrated `hydrogen.challenges.poisson_2d` + `hydrogen.physics.gates`
+  - `dummy_physics_neural_operator_forward` (clear TODO for real PhysicsNeMo training)
+  - `forward()` hook ready for Bittensor Synapse
+  - Standalone `main()` demo that runs the full validator logic without needing the network
 
-**This update (Step 1)**:
-- Concrete `hydrogen/challenges/poisson_2d.py`: full Challenge dataclass + synthetic data generator + pre-computed symbolic metadata JSON + `load_challenge()` entrypoint.
-- `scripts/local_validate.py`: runnable end-to-end demo. Loads challenge, applies strategy, runs dummy forward, exercises ALL physics gates, computes log-improvement score, prints structured feedback exactly as miners/agents will receive.
-
-**How to run right now**:
+**How to run the validator core now**:
 ```bash
-cd Hydrogen
-pip install -e ".[dev]"
-python scripts/local_validate.py --challenge poisson_2d_v1 --noise 0.012
+python neurons/validator.py --challenge poisson_2d_v1 --noise 0.012
 ```
 
-You should see PASS on all gates + positive log-improvement when noise is low enough.
+You get a full `ValidationResult` with score, improvement, gate breakdown, etc.
 
-**Next (recommended)**: #2 — Flesh out `neurons/validator.py` forward() to call real (stub) training + the gates we just wired.
+**Progress summary**:
+We now have a complete runnable prototype of the core loop:
+Challenge → Strategy → Forward (stub) → Gates → Score + Structured Result
 
-Old duplicated files can still be cleaned up.
+**Next recommended**: Add a simple Landscape script (fragment storage + baseline update) or start wiring real PhysicsNeMo training into the dummy forward.
+
+Old duplicated files (Sepc.md, ReadMe.md) can be deleted for cleanliness.
