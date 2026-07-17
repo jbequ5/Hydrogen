@@ -1,4 +1,4 @@
-"""Strategy generation supporting Poisson, Darcy, and Burgers."""
+"""Strategy generation supporting all current challenges."""
 
 from typing import Dict, Any, Tuple
 import torch
@@ -21,9 +21,10 @@ def generate_strategy(challenge_id: str = "poisson_2d_v1") -> Dict[str, Any]:
     except Exception:
         suggested_weights = {"pde_residual": 1.0, "boundary": 0.8}
 
+    res = getattr(challenge, 'resolution', [128, 128])
     return {
         "backbone": "PINO",
-        "resolution": list(getattr(challenge, 'resolution', [128, 128])),
+        "resolution": list(res),
         "pino": {
             "loss_vector": suggested_weights,
             "physics_loss_type": "pde_residual",
@@ -35,7 +36,7 @@ def generate_strategy(challenge_id: str = "poisson_2d_v1") -> Dict[str, Any]:
         "curriculum_learning": {
             "enabled": True,
             "start_resolution": [64, 64],
-            "end_resolution": list(getattr(challenge, 'resolution', [128, 128])),
+            "end_resolution": list(res),
             "ramp_epochs": 30,
         },
         "uq_config": {
@@ -59,8 +60,10 @@ def get_local_validation_score(
         if use_real_training and PHYSICSNEMO_AVAILABLE:
             results = train_physics_neural_operator(challenge, strategy, epochs=quick_epochs)
         else:
+            # Generic fallback
             stress = challenge.stress_data
-            u_true = stress.get("u_true", stress.get("u"))[0] if "u_true" in stress else stress[list(stress.keys())[0]][0]
+            first_key = list(stress.keys())[0]
+            u_true = stress[first_key][0]
             noise_level = strategy.get("noise_level", 0.012)
             u_pred = u_true + noise_level * torch.randn_like(u_true)
 
@@ -74,11 +77,22 @@ def get_local_validation_score(
                 "dE_dt": torch.tensor([-0.0002]),
             }
 
-        pde_type = "burgers" if "burgers" in challenge_id else ("darcy" if "darcy" in challenge_id else "poisson")
+        if "burgers" in challenge_id:
+            pde_type = "burgers"
+        elif "darcy" in challenge_id:
+            pde_type = "darcy"
+        elif "heat" in challenge_id:
+            pde_type = "heat"
+        elif "elasticity" in challenge_id:
+            pde_type = "elasticity"
+        else:
+            pde_type = "poisson"
+
         hard_pass, gate_details = evaluate_all_gates(results, pde_type=pde_type)
 
-        u_true_key = "u_true" if "u_true" in challenge.stress_data else list(challenge.stress_data.keys())[0]
-        submission_error = compute_relative_l2_error(results["u_pred"], challenge.stress_data[u_true_key][0])
+        # Robust error calculation
+        u_key = next((k for k in ["u_true", "ux_true", "u"] if k in challenge.stress_data), list(challenge.stress_data.keys())[0])
+        submission_error = compute_relative_l2_error(results.get("u_pred", results.get("ux_pred", torch.zeros_like(challenge.stress_data[u_key][0]))), challenge.stress_data[u_key][0])
         baseline_error = challenge.baseline_error
         improvement = float(torch.log(torch.tensor(baseline_error)) - torch.log(torch.tensor(submission_error)))
 

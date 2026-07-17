@@ -1,4 +1,4 @@
-"""Hydrogen Validator with full multi-challenge support (Poisson, Darcy, Burgers)."""
+"""Hydrogen Validator supporting broad challenge set."""
 
 import time
 import numpy as np
@@ -15,8 +15,14 @@ class Validator(BaseValidatorNeuron):
         self.scores = {}
         self.moving_average_alpha = 0.15
         self.current_challenge_index = 0
-        self.challenge_ids = ["poisson_2d_v1", "darcy_2d_v1", "burgers_v1"]
-        bt.logging.info("Hydrogen Validator initialized with Poisson + Darcy + Burgers.")
+        self.challenge_ids = [
+            "poisson_2d_v1",
+            "darcy_2d_v1",
+            "burgers_v1",
+            "heat_v1",
+            "elasticity_2d_v1",
+        ]
+        bt.logging.info("Hydrogen Validator with broad challenge coverage (5 PDEs).")
 
     async def forward(self):
         bt.logging.info("Starting validation round...")
@@ -50,7 +56,7 @@ class Validator(BaseValidatorNeuron):
                 round_scores[hotkey] = score
                 improvements.append((hotkey, improvement))
 
-                bt.logging.info(f"{hotkey[:8]} on {challenge_id}: score={score:.4f}, improvement={improvement:+.4f}")
+                bt.logging.info(f"{hotkey[:8]} on {challenge_id}: score={score:.4f}")
 
         self._update_scores(round_scores, improvements)
 
@@ -107,16 +113,26 @@ class Validator(BaseValidatorNeuron):
 
         results = train_physics_neural_operator(challenge, strategy, epochs=6)
 
-        pde_type = "burgers" if "burgers" in challenge_id else ("darcy" if "darcy" in challenge_id else "poisson")
+        if "burgers" in challenge_id:
+            pde_type = "burgers"
+        elif "darcy" in challenge_id:
+            pde_type = "darcy"
+        elif "heat" in challenge_id:
+            pde_type = "heat"
+        elif "elasticity" in challenge_id:
+            pde_type = "elasticity"
+        else:
+            pde_type = "poisson"
+
         hard_pass, gate_details = evaluate_all_gates(results, pde_type=pde_type)
 
         if not hard_pass:
             return {"score": 0.0, "improvement": 0.0, "hard_pass": False}
 
-        u_key = "u_true" if "u_true" in challenge.stress_data else list(challenge.stress_data.keys())[0]
-        u_pred = results["u_pred"]
-        u_true = challenge.stress_data[u_key][0]
-        submission_error = compute_relative_l2_error(u_pred, u_true)
+        # Flexible field access
+        u_key = next((k for k in ["u_true", "ux_true", "u"] if k in challenge.stress_data), list(challenge.stress_data.keys())[0])
+        u_pred = results.get("u_pred", results.get("ux_pred", torch.zeros_like(challenge.stress_data[u_key][0])))
+        submission_error = compute_relative_l2_error(u_pred, challenge.stress_data[u_key][0])
         improvement = float(torch.log(torch.tensor(baseline_error)) - torch.log(torch.tensor(submission_error)))
 
         return {
