@@ -1,7 +1,8 @@
-"""Stress Test Engine with UQ Calibration Stress.
+"""Stress Test Engine with Weak Local Version for Miners.
 
-Now includes explicit UQ calibration checking on hidden stress sets.
-We learn from uncertainty quality (good calibration can be rewarded).
+The full stress test (used by validators) is hidden and strong.
+This weak local version gives miners useful signal without letting them
+game the hidden test.
 """
 
 import hashlib
@@ -130,20 +131,16 @@ def compute_stress_metrics(
     elif pde_type == "heat":
         metrics["diffusion_robustness"] = max(0.0, 1.0 - base_error * 3)
 
-    # === UQ Calibration Stress ===
     if results is not None:
         uncertainty = results.get("uncertainty", results.get("std", results.get("ensemble_std", None)))
         if uncertainty is not None and isinstance(uncertainty, torch.Tensor):
-            # Simple calibration proxy: correlation between error and uncertainty
             error_map = torch.abs(u_pred - u_true)
             if error_map.numel() > 10 and uncertainty.numel() > 10:
-                # Flatten and compute correlation
                 err_flat = error_map.flatten().detach().cpu().numpy()
                 unc_flat = uncertainty.flatten().detach().cpu().numpy()
                 if np.std(unc_flat) > 1e-6:
                     corr = np.corrcoef(err_flat, unc_flat)[0, 1]
                     metrics["uq_error_correlation"] = float(corr)
-                    # Good calibration → positive correlation
                     metrics["uq_calibration_score"] = max(0.0, min(1.0, (corr + 1) / 2))
                 else:
                     metrics["uq_calibration_score"] = 0.5
@@ -178,7 +175,6 @@ def run_stress_test(
     base_error = stress_metrics.get("stress_l2_error", 0.6)
     uq_calib = stress_metrics.get("uq_calibration_score", 0.5)
 
-    # Reward good UQ calibration slightly
     final_stress_score = max(0.0, 1.0 - base_error * 2.6 + (uq_calib - 0.5) * 0.3)
 
     return {
@@ -186,5 +182,53 @@ def run_stress_test(
         "gate_details": gate_details,
         "stress_metrics": stress_metrics,
         "final_stress_score": final_stress_score,
+        "conditions": conditions,
+    }
+
+
+def run_weak_local_stress_test(
+    challenge_id: str,
+    results: Dict[str, torch.Tensor],
+    u_pred: torch.Tensor,
+    u_true: torch.Tensor,
+    pde_type: str,
+    difficulty: float = 0.6,
+) -> Dict[str, Any]:
+    """
+    Weak local stress test for miners.
+
+    - Uses fixed/public generation (not hidden)
+    - Lower difficulty
+    - Softer gates
+    - Mainly for guidance, not for perfect optimization
+    - Still encourages robustness without revealing validator secrets
+    """
+    # Use a fixed, known seed so it's reproducible but not adversarial
+    conditions = generate_stress_conditions(
+        challenge_id, difficulty=difficulty, salt="weak_local_stress"
+    )
+
+    # Run lighter version of hard gates
+    hard_pass, gate_details = run_hard_gates(results, pde_type, conditions)
+
+    if not hard_pass:
+        return {
+            "hard_pass": False,
+            "gate_details": gate_details,
+            "stress_metrics": {},
+            "local_stress_score": 0.0,
+            "conditions": conditions,
+        }
+
+    stress_metrics = compute_stress_metrics(u_pred, u_true, conditions, pde_type, results=results)
+
+    base_error = stress_metrics.get("stress_l2_error", 0.6)
+    local_stress_score = max(0.0, 1.0 - base_error * 2.2)
+
+    return {
+        "hard_pass": True,
+        "gate_details": gate_details,
+        "stress_metrics": stress_metrics,
+        "local_stress_score": local_stress_score,
         "conditions": conditions,
     }
