@@ -1,9 +1,9 @@
-"""Causal Knowledge Base for Hydrogen (SOTA Double ML + Symbolic).
+"""Causal Knowledge Base (Challenge + Backbone aware, high-signal).
 
-Builds and maintains a causal understanding of what drives performance
-across challenges using Double Machine Learning + PySR.
+Designed to extract maximum causal signal while respecting that
+effects are challenge-specific and often backbone-specific.
 
-This is the core of the Landscape agent's reasoning capability.
+Miners can query this to get the current best priors/strategy components.
 """
 
 import json
@@ -15,7 +15,6 @@ import numpy as np
 
 try:
     from econml.dml import LinearDML
-    from econml.cate import CATEEstimator
     ECONML_AVAILABLE = True
 except ImportError:
     ECONML_AVAILABLE = False
@@ -32,37 +31,39 @@ from .storage import save_symbolic_artifact, load_symbolic_artifacts
 
 class CausalKnowledgeBase:
     """
-    Maintains a causal knowledge base using Double ML and symbolic methods.
+    Challenge- and backbone-aware causal knowledge base.
 
-    Capabilities:
-    - Estimate causal effects of design choices (loss weights, etc.)
-    - Discover heterogeneous treatment effects
-    - Integrate PySR symbolic expressions
-    - Provide best priors to miners and validators
+    Uses Double ML (when available) + PySR to build high-signal causal understanding.
+    Miners and validators can query it for the current best priors.
     """
 
     def __init__(self, storage_dir: str = "./data/landscape"):
         self.storage_dir = storage_dir
         os.makedirs(storage_dir, exist_ok=True)
-        self.causal_estimates: Dict[str, Dict[str, Any]] = {}
+        # Keyed by (challenge_id, backbone)
+        self.causal_estimates: Dict[Tuple[str, str], Dict[str, Any]] = {}
+
+    def _make_key(self, challenge_id: str, backbone: str = "default") -> Tuple[str, str]:
+        return (challenge_id, backbone)
 
     def add_observation(
         self,
         challenge_id: str,
-        features: Dict[str, float],
-        treatment: Dict[str, float],
-        outcome: float,
+        backbone: str = "PINO",
+        features: Dict[str, float] = None,
+        treatment: Dict[str, float] = None,
+        outcome: float = 0.0,
         metadata: Optional[Dict[str, Any]] = None,
     ):
         """
-        Add a new observation (e.g. from a training run).
-
-        features: context variables (e.g. Reynolds number, permeability contrast)
-        treatment: variables whose causal effect we want to estimate (loss weights)
-        outcome: performance metric (improvement or negative error)
+        Add an observation. Strongly recommended to include backbone.
         """
+        features = features or {}
+        treatment = treatment or {}
+
         artifact = {
             "challenge_id": challenge_id,
+            "backbone": backbone,
             "features": features,
             "treatment": treatment,
             "outcome": outcome,
@@ -74,131 +75,156 @@ class CausalKnowledgeBase:
             artifact_type="causal_observation",
             challenge_id=challenge_id,
             content=artifact,
-            metadata={"source": "training_run"},
+            metadata={"source": "training_run", "backbone": backbone},
         )
 
     def estimate_causal_effects(
         self,
         challenge_id: str,
+        backbone: str = "PINO",
         treatment_key: str = "pde_residual_weight",
-        n_iterations: int = 50,
+        min_samples: int = 30,
     ) -> Dict[str, Any]:
         """
-        Estimate causal effect of a treatment variable using Double ML.
+        Estimate causal effect using Double ML, conditioned on challenge + backbone.
 
-        Uses econml's LinearDML when available (SOTA), otherwise falls back
-        to a simpler residual-on-residual approach.
+        We are careful not to pool across very different regimes.
         """
+        key = self._make_key(challenge_id, backbone)
         artifacts = load_symbolic_artifacts(
             artifact_type="causal_observation",
             challenge_id=challenge_id,
-            limit=500,
+            limit=1000,
         )
 
-        if len(artifacts) < 20:
-            return {"status": "insufficient_data", "n_observations": len(artifacts)}
+        # Filter to this backbone when possible
+        filtered = [
+            a for a in artifacts
+            if a.get("content", {}).get("backbone", "default") == backbone
+        ]
+        if len(filtered) < min_samples:
+            filtered = artifacts  # fallback to all if not enough backbone-specific data
 
-        # Build dataset
-        X = []  # confounders / features
-        T = []  # treatment
-        Y = []  # outcome
+        if len(filtered) < min_samples:
+            return {
+                "status": "insufficient_data",
+                "n_observations": len(filtered),
+                "challenge_id": challenge_id,
+                "backbone": backbone,
+            }
 
-        for art in artifacts:
+        # Build arrays
+        X, T, Y = [], [], []
+        for art in filtered:
             content = art.get("content", {})
             if treatment_key not in content.get("treatment", {}):
                 continue
 
-            features = list(content.get("features", {}).values())
-            treatment_val = content["treatment"][treatment_key]
-            outcome_val = content["outcome"]
+            feat_vec = list(content.get("features", {}).values())
+            t_val = content["treatment"][treatment_key]
+            y_val = content["outcome"]
 
-            X.append(features)
-            T.append([treatment_val])
-            Y.append(outcome_val)
+            X.append(feat_vec)
+            T.append(t_val)
+            Y.append(y_val)
 
-        if len(Y) < 20:
+        if len(Y) < min_samples:
             return {"status": "insufficient_data_after_filtering", "n": len(Y)}
 
         X = np.array(X)
         T = np.array(T).ravel()
         Y = np.array(Y)
 
+        method_used = "simple_residual_on_residual"
+        ate = 0.0
+
         if ECONML_AVAILABLE:
             try:
-                model = LinearDML(
-                    model_y="auto",
-                    model_t="auto",
-                    discrete_treatment=False,
-                    random_state=42,
-                )
+                model = LinearDML(model_y="auto", model_t="auto", random_state=42)
                 model.fit(Y, T, X=X)
-                ate = model.ate(X)
-                return {
-                    "status": "success",
-                    "method": "LinearDML",
-                    "ate": float(ate),
-                    "n_samples": len(Y),
-                    "treatment": treatment_key,
-                }
-            except Exception as e:
-                pass  # fall through to simple method
+                ate = float(model.ate(X))
+                method_used = "LinearDML"
+            except Exception:
+                pass
 
-        # Fallback: simple residual-on-residual (Double ML style)
-        from sklearn.linear_model import Ridge
-        from sklearn.model_selection import cross_val_predict
+        if method_used == "simple_residual_on_residual":
+            from sklearn.linear_model import Ridge
+            from sklearn.model_selection import cross_val_predict
 
-        mu_y = cross_val_predict(Ridge(), X, Y, cv=5)
-        mu_t = cross_val_predict(Ridge(), X, T, cv=5)
+            mu_y = cross_val_predict(Ridge(), X, Y, cv=5)
+            mu_t = cross_val_predict(Ridge(), X, T, cv=5)
+            residual_y = Y - mu_y
+            residual_t = T - mu_t
+            ate = np.mean(residual_y * residual_t) / (np.var(residual_t) + 1e-8)
 
-        residual_y = Y - mu_y
-        residual_t = T - mu_t
-
-        ate = np.mean(residual_y * residual_t) / (np.var(residual_t) + 1e-8)
-
-        return {
+        result = {
             "status": "success",
-            "method": "simple_residual_on_residual",
-            "ate": float(ate),
+            "method": method_used,
+            "ate": ate,
             "n_samples": len(Y),
+            "challenge_id": challenge_id,
+            "backbone": backbone,
             "treatment": treatment_key,
+            "timestamp": int(time.time()),
         }
 
-    def get_best_priors(self, challenge_id: str) -> Dict[str, Any]:
+        self.causal_estimates[key] = result
+        save_symbolic_artifact(
+            artifact_type="causal_estimate",
+            challenge_id=challenge_id,
+            content=result,
+            metadata={"backbone": backbone, "source": "CausalKnowledgeBase"},
+        )
+        return result
+
+    def get_best_priors(
+        self,
+        challenge_id: str,
+        backbone: str = "PINO",
+    ) -> Dict[str, Any]:
         """
-        Return the best known priors (loss weights, scoring expressions, etc.)
-        for a given challenge, combining causal estimates and symbolic artifacts.
+        Return the current best known priors for this challenge + backbone.
+
+        This is what miners should call to get the current 'winning' strategy components.
         """
-        # Load recent PySR scoring expressions
-        scoring_artifacts = load_symbolic_artifacts(
+        key = self._make_key(challenge_id, backbone)
+
+        # Get latest causal estimate
+        causal = self.causal_estimates.get(key, {})
+
+        # Get recent PySR scoring expressions
+        scoring = load_symbolic_artifacts(
             artifact_type="pysr_scoring",
             challenge_id=challenge_id,
-            limit=10,
+            limit=5,
         )
 
-        # Load recent evolved loss weights
-        weight_artifacts = load_symbolic_artifacts(
+        # Get recent evolved loss weights
+        weights = load_symbolic_artifacts(
             artifact_type="evolved_loss_weights",
             challenge_id=challenge_id,
-            limit=10,
+            limit=5,
         )
 
-        best = {
+        # Build actionable priors
+        best_loss_vector = {}
+        if weights:
+            # Take the most recent evolved weights if available
+            best_loss_vector = weights[0].get("content", {}).get("loss_vector", {})
+
+        best_scoring_expr = None
+        if scoring:
+            best_scoring_expr = scoring[0].get("content", {}).get("expression")
+
+        return {
             "challenge_id": challenge_id,
-            "causal_estimates": self.causal_estimates.get(challenge_id, {}),
-            "pysr_scoring": scoring_artifacts[:3] if scoring_artifacts else [],
-            "evolved_weights": weight_artifacts[:3] if weight_artifacts else [],
+            "backbone": backbone,
+            "causal_estimate": causal,
+            "recommended_loss_vector": best_loss_vector,
+            "recommended_scoring_expression": best_scoring_expr,
+            "last_updated": causal.get("timestamp") or int(time.time()),
         }
 
-        return best
-
-    def update_from_observations(self, challenge_id: str):
-        """Re-estimate causal effects after new observations are added."""
-        result = self.estimate_causal_effects(challenge_id)
-        if result.get("status") == "success":
-            self.causal_estimates[challenge_id] = result
-            save_symbolic_artifact(
-                artifact_type="causal_estimate",
-                challenge_id=challenge_id,
-                content=result,
-                metadata={"source": "CausalKnowledgeBase"},
-            )
+    def update_from_observations(self, challenge_id: str, backbone: str = "PINO"):
+        """Re-estimate causal effects for this challenge + backbone."""
+        return self.estimate_causal_effects(challenge_id, backbone=backbone)
