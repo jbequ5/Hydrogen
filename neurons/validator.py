@@ -1,7 +1,6 @@
-"""Hydrogen Validator with Emission Mechanics Integration.
+"""Hydrogen Validator with full emission weight application.
 
-Now tracks per-challenge leaderboards and detects breakthroughs
-using the new 75/25 emission system.
+Now properly applies the 75/25 emission logic on-chain via set_weights().
 """
 
 import time
@@ -15,7 +14,7 @@ from hydrogen.challenges import load_challenge
 from hydrogen.physics.stress import run_stress_test
 from hydrogen.emission.mechanics import (
     update_leaderboard,
-    is_breakthrough,
+    get_yuma_weights,
     get_or_create_state,
 )
 
@@ -35,7 +34,7 @@ class Validator(BaseValidatorNeuron):
             "ns_2d_laminar_v1",
         ]
         self.use_benchmark = True
-        bt.logging.info("Hydrogen Validator with emission mechanics (75/25) integrated.")
+        bt.logging.info("Hydrogen Validator with on-chain emission weight logic active.")
 
     async def forward(self):
         bt.logging.info("Starting validation round...")
@@ -69,7 +68,6 @@ class Validator(BaseValidatorNeuron):
                 round_scores[hotkey] = score
                 improvements.append((hotkey, improvement))
 
-                # === Emission Integration ===
                 stress_result = validation.get("stress_result", {})
                 final_stress_score = stress_result.get("final_stress_score", score)
 
@@ -81,8 +79,6 @@ class Validator(BaseValidatorNeuron):
 
                 if was_breakthrough:
                     bt.logging.warning(f"🚀 BREAKTHROUGH on {challenge_id}! {msg}")
-
-                bt.logging.info(f"{hotkey[:8]} on {challenge_id}: score={score:.4f}")
 
         self._update_scores(round_scores, improvements)
 
@@ -104,20 +100,43 @@ class Validator(BaseValidatorNeuron):
                     self.scores[hotkey] *= 1.15
 
     def _set_weights(self):
+        """
+        Applies the decaying Top-2 stipend weights on-chain.
+        """
         try:
+            weight_dict = {}  # hotkey -> total weight
+
+            # Aggregate Top-2 stipend weights across all challenges
+            for challenge_id in self.challenge_ids:
+                challenge_weights = get_yuma_weights(
+                    challenge_id=challenge_id,
+                    total_stipend_pool=1.0,   # normalized later
+                )
+
+                for hotkey, w in challenge_weights.items():
+                    if hotkey in weight_dict:
+                        weight_dict[hotkey] += w
+                    else:
+                        weight_dict[hotkey] = w
+
+            if not weight_dict:
+                bt.logging.warning("No Top-2 weights to set this epoch.")
+                return
+
+            # Convert to uids and weights
             hotkeys = []
             weights = []
-            for hotkey, score in self.scores.items():
+            for hotkey, w in weight_dict.items():
                 if hotkey in self.metagraph.hotkeys:
                     uid = self.metagraph.hotkeys.index(hotkey)
                     hotkeys.append(uid)
-                    weights.append(max(0.01, score))
+                    weights.append(float(w))
 
             if not hotkeys:
                 return
 
             weights = np.array(weights, dtype=np.float32)
-            weights = weights / weights.sum()
+            weights = weights / weights.sum() if weights.sum() > 0 else weights
 
             result = self.subtensor.set_weights(
                 wallet=self.wallet,
@@ -125,7 +144,7 @@ class Validator(BaseValidatorNeuron):
                 uids=hotkeys,
                 weights=weights,
             )
-            bt.logging.info("Weights set.")
+            bt.logging.info(f"Weights set for {len(hotkeys)} miners (Top-2 stipend).")
 
         except Exception as e:
             bt.logging.error(f"Weight setting failed: {e}")
@@ -183,7 +202,6 @@ class Validator(BaseValidatorNeuron):
 
         stress_score = stress_result.get("final_stress_score", 0.5)
 
-        # Adaptive weighting (public vs stress)
         stress_weight = 0.35 + min(0.25, public_improvement * 0.8)
         stress_weight = min(0.65, max(0.35, stress_weight))
         public_weight = 1.0 - stress_weight
