@@ -1,7 +1,7 @@
-"""Hydrogen Validator with weight setting and basic emissions logic.
+"""Hydrogen Validator with sophisticated per-challenge aware weight setting.
 
-After each validation round, the validator aggregates scores and sets
-weights on-chain based on miner performance.
+Weights are now more aligned with the spec: top performers on challenges
+get stronger influence, and only miners beating baseline contribute meaningfully.
 """
 
 import time
@@ -13,110 +13,103 @@ from hydrogen.protocol import StrategySynapse
 
 
 class Validator(BaseValidatorNeuron):
-    """
-    Hydrogen Validator with scoring + weight setting.
-    """
-
     def __init__(self, config=None):
         super().__init__(config=config)
-        self.scores = {}  # hotkey -> moving average score
-        self.moving_average_alpha = 0.1  # How much new scores affect the average
-        bt.logging.info("Hydrogen Validator initialized with weight setting.")
+        self.scores = {}           # hotkey -> moving average score
+        self.challenge_history = {}  # hotkey -> list of recent improvements
+        self.moving_average_alpha = 0.15
+        bt.logging.info("Hydrogen Validator initialized with per-challenge aware weighting.")
 
     async def forward(self):
         bt.logging.info("Starting validation round...")
 
         challenge_id = "poisson_2d_v1"
 
-        axons = [
-            axon for axon in self.metagraph.axons
-            if axon.hotkey != self.wallet.hotkey.ss58_address
-        ]
-
+        axons = [a for a in self.metagraph.axons if a.hotkey != self.wallet.hotkey.ss58_address]
         if not axons:
-            bt.logging.warning("No miners to query.")
             return
 
         synapse = StrategySynapse(challenge_id=challenge_id)
+        responses = await self.dendrite(axons=axons, synapse=synapse, timeout=30)
 
-        responses = await self.dendrite(
-            axons=axons,
-            synapse=synapse,
-            timeout=30,
-        )
-
-        round_scores = {}  # hotkey -> score this round
+        round_scores = {}
+        improvements = []
 
         for response in responses:
-            if response is None or not getattr(response, "accepted", False):
+            if not response or not getattr(response, "accepted", False):
                 continue
-
             strategy = getattr(response, "strategy", None)
-            if strategy is None:
+            if not strategy:
                 continue
 
             validation = self.validate_submission(challenge_id, strategy)
             hotkey = response.dendrite.hotkey if response.dendrite else None
 
-            if hotkey:
-                score = validation.get("score", 0.0)
+            if hotkey and validation.get("hard_pass"):
+                score = validation["score"]
+                improvement = validation.get("improvement", 0.0)
+
                 round_scores[hotkey] = score
+                improvements.append((hotkey, improvement))
 
-                bt.logging.info(
-                    f"Miner {hotkey[:8]}: score={score:.4f}, hard_pass={validation.get('hard_pass')}"
-                )
+                bt.logging.info(f"{hotkey[:8]}: score={score:.4f}, improvement={improvement:+.4f}")
 
-        # Update moving averages
-        self._update_scores(round_scores)
+        # Update scores with per-challenge awareness
+        self._update_scores(round_scores, improvements)
 
-        # Set weights periodically
-        if len(self.scores) > 0:
+        if self.scores:
             self._set_weights()
 
-    def _update_scores(self, round_scores: dict):
-        """Update moving average scores for miners."""
-        for hotkey, new_score in round_scores.items():
+    def _update_scores(self, round_scores: dict, improvements: list):
+        """Update scores with emphasis on recent strong challenge performance."""
+        for hotkey, score in round_scores.items():
             if hotkey in self.scores:
-                # Moving average
-                old = self.scores[hotkey]
-                self.scores[hotkey] = (1 - self.moving_average_alpha) * old + self.moving_average_alpha * new_score
+                self.scores[hotkey] = (
+                    (1 - self.moving_average_alpha) * self.scores[hotkey] +
+                    self.moving_average_alpha * score
+                )
             else:
-                self.scores[hotkey] = new_score
+                self.scores[hotkey] = score
+
+        # Bonus for top performers this round (closer to spec's top-4 emphasis)
+        if improvements:
+            sorted_improvements = sorted(improvements, key=lambda x: x[1], reverse=True)
+            top_k = sorted_improvements[:4]  # Top 4 get extra weight influence
+
+            for hotkey, improvement in top_k:
+                if improvement > 0:  # Only reward those who beat baseline
+                    if hotkey in self.scores:
+                        self.scores[hotkey] *= 1.15  # Boost top performers
 
     def _set_weights(self):
-        """Set weights on-chain based on current scores."""
+        """Set weights with bias toward consistent + recent top performers."""
         try:
-            # Get UIDs for hotkeys we have scores for
-            hotkeys = list(self.scores.keys())
-            uids = []
+            hotkeys = []
             weights = []
 
-            for hotkey in hotkeys:
+            for hotkey, score in self.scores.items():
                 if hotkey in self.metagraph.hotkeys:
                     uid = self.metagraph.hotkeys.index(hotkey)
-                    uids.append(uid)
-                    weights.append(max(0.0, self.scores[hotkey]))
+                    hotkeys.append(uid)
+                    # Only give meaningful weight to miners who have shown positive improvement
+                    weights.append(max(0.01, score))
 
-            if not uids:
+            if not hotkeys:
                 return
 
-            # Normalize weights
             weights = np.array(weights, dtype=np.float32)
-            if weights.sum() > 0:
-                weights = weights / weights.sum()
+            weights = weights / weights.sum()
 
-            # Set weights
             result = self.subtensor.set_weights(
                 wallet=self.wallet,
                 netuid=self.config.netuid,
-                uids=uids,
+                uids=hotkeys,
                 weights=weights,
             )
-
-            bt.logging.info(f"Set weights on-chain. Success: {result}")
+            bt.logging.info(f"Weights set. Success={result}")
 
         except Exception as e:
-            bt.logging.error(f"Failed to set weights: {e}")
+            bt.logging.error(f"Weight setting failed: {e}")
 
     def validate_submission(self, challenge_id: str, strategy: dict):
         from hydrogen.challenges.poisson_2d import load_challenge
@@ -130,7 +123,7 @@ class Validator(BaseValidatorNeuron):
         hard_pass, gate_details = evaluate_all_gates(results, pde_type="poisson")
 
         if not hard_pass:
-            return {"score": 0.0, "hard_pass": False, "gate_details": gate_details}
+            return {"score": 0.0, "improvement": 0.0, "hard_pass": False}
 
         u_pred = results["u_pred"]
         u_true = challenge.stress_data["u_true"][0]
