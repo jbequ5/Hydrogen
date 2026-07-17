@@ -1,4 +1,4 @@
-"""Validator with PySR-based scoring evolution (regressing on gate outputs + improvement)."""
+"""Validator that saves PySR discoveries to the shared Landscape storage."""
 
 import time
 import numpy as np
@@ -8,6 +8,7 @@ import bittensor as bt
 from hydrogen.base.validator import BaseValidatorNeuron
 from hydrogen.protocol import StrategySynapse
 from hydrogen.challenges import load_challenge
+from hydrogen.landscape.storage import save_symbolic_artifact
 
 try:
     from pysr import PySRRegressor
@@ -32,8 +33,7 @@ class Validator(BaseValidatorNeuron):
         ]
         self.use_benchmark = True
         self.use_pysr_scoring = PYSR_AVAILABLE
-        self.pysr_scoring_model = None
-        bt.logging.info("Hydrogen Validator with PySR gate regression enabled.")
+        bt.logging.info("Hydrogen Validator saving PySR artifacts to Landscape storage.")
 
     async def forward(self):
         bt.logging.info("Starting validation round...")
@@ -151,22 +151,24 @@ class Validator(BaseValidatorNeuron):
         submission_error = compute_relative_l2_error(u_pred, u_true)
         improvement = float(torch.log(torch.tensor(baseline_error)) - torch.log(torch.tensor(submission_error)))
 
-        # PySR: Try to learn better scoring from gate outputs + improvement
         final_score = max(0.0, improvement)
+
+        # PySR regression on gate outputs + improvement
         if self.use_pysr_scoring and PYSR_AVAILABLE and gate_details:
             try:
-                # Collect gate values + improvement as features
                 gate_values = []
+                gate_names = []
                 for gate_name, value in gate_details.items():
                     if isinstance(value, (int, float, bool)):
                         gate_values.append(float(value))
+                        gate_names.append(gate_name)
 
                 if len(gate_values) >= 2:
                     X = np.array([gate_values])
                     y = np.array([improvement])
 
                     model = PySRRegressor(
-                        niterations=10,
+                        niterations=12,
                         binary_operators=["+", "*"],
                         unary_operators=["exp"],
                         verbosity=0,
@@ -174,10 +176,23 @@ class Validator(BaseValidatorNeuron):
                     )
                     model.fit(X, y)
 
-                    # Use the model to predict a refined score
                     predicted = model.predict(X)[0]
                     final_score = max(0.0, float(predicted))
-                    bt.logging.info(f"PySR discovered scoring expression for {challenge_id}")
+
+                    # Save discovered expression to shared Landscape storage
+                    artifact = {
+                        "expression": str(model.get_best()),
+                        "gate_names": gate_names,
+                        "predicted_improvement": float(predicted),
+                        "actual_improvement": improvement,
+                    }
+                    save_symbolic_artifact(
+                        artifact_type="pysr_scoring",
+                        challenge_id=challenge_id,
+                        content=artifact,
+                        metadata={"source": "validator"},
+                    )
+                    bt.logging.info(f"Saved PySR scoring artifact for {challenge_id}")
             except Exception as e:
                 bt.logging.debug(f"PySR scoring failed: {e}")
 

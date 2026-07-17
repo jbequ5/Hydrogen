@@ -1,3 +1,9 @@
-"""Landscape Agent stubs: fragment store + Double ML causal update (Phase 0)."""
+"""Landscape Agent module (initial skeleton).
 
-# TODO: daily_causal_update(), propose_baseline(), fragment DAG storage
+Will eventually handle collection, storage, and distribution of
+symbolic priors, evolved loss weights, and learned scoring expressions.
+"""
+
+from .storage import save_symbolic_artifact, load_symbolic_artifacts
+
+__all__ = ["save_symbolic_artifact", "load_symbolic_artifacts"]
