@@ -1,6 +1,7 @@
-"""Hydrogen Validator with integrated stress testing.
+"""Hydrogen Validator with intelligent public vs stress weighting.
 
-Now runs hidden procedural stress tests with hard gates.
+As public performance improves, we gradually put more weight on hidden stress tests.
+This creates a natural curriculum: first learn to fit, then learn to generalize.
 """
 
 import time
@@ -29,7 +30,11 @@ class Validator(BaseValidatorNeuron):
             "ns_2d_laminar_v1",
         ]
         self.use_benchmark = True
-        bt.logging.info("Hydrogen Validator with hidden stress testing enabled.")
+
+        # Intelligent weighting: start favoring public, increase stress weight over time
+        self.base_stress_weight = 0.35
+        self.max_stress_weight = 0.65
+        bt.logging.info("Hydrogen Validator with adaptive stress weighting enabled.")
 
     async def forward(self):
         bt.logging.info("Starting validation round...")
@@ -118,10 +123,8 @@ class Validator(BaseValidatorNeuron):
         challenge = load_challenge(challenge_id, use_benchmark=self.use_benchmark)
         baseline_error = challenge.baseline_error
 
-        # Train on public data
         results = train_physics_neural_operator(challenge, strategy, epochs=6)
 
-        # Determine pde_type
         if "ns_2d" in challenge_id or "navier" in challenge_id:
             pde_type = "navier_stokes"
         elif "burgers" in challenge_id:
@@ -135,7 +138,7 @@ class Validator(BaseValidatorNeuron):
         else:
             pde_type = "poisson"
 
-        # Public holdout evaluation
+        # Public holdout
         u_key = next(
             (k for k in ["u_true", "velocity_true", "ux_true", "u"] if k in challenge.stress_data),
             list(challenge.stress_data.keys())[0]
@@ -148,7 +151,7 @@ class Validator(BaseValidatorNeuron):
         public_error = compute_relative_l2_error(u_pred, u_true)
         public_improvement = float(torch.log(torch.tensor(baseline_error)) - torch.log(torch.tensor(public_error)))
 
-        # === Hidden Stress Test ===
+        # Hidden stress test
         stress_result = run_stress_test(
             challenge_id=challenge_id,
             results=results,
@@ -159,7 +162,6 @@ class Validator(BaseValidatorNeuron):
         )
 
         if not stress_result["hard_pass"]:
-            bt.logging.warning(f"{challenge_id} stress test HARD FAIL for strategy")
             return {
                 "score": 0.0,
                 "improvement": 0.0,
@@ -167,16 +169,27 @@ class Validator(BaseValidatorNeuron):
                 "stress_result": stress_result,
             }
 
-        # Combine public improvement + stress performance
         stress_score = stress_result.get("final_stress_score", 0.5)
-        final_score = max(0.0, public_improvement * 0.6 + stress_score * 0.4)
+
+        # === Intelligent Adaptive Weighting ===
+        # As public performance gets better (lower baseline_error or high public_improvement),
+        # we trust the hidden stress test more.
+        # Simple heuristic: higher public_improvement → slightly higher stress weight
+        stress_weight = self.base_stress_weight + min(0.25, public_improvement * 0.8)
+        stress_weight = min(self.max_stress_weight, max(self.base_stress_weight, stress_weight))
+
+        public_weight = 1.0 - stress_weight
+
+        final_score = (public_improvement * public_weight) + (stress_score * stress_weight)
 
         return {
-            "score": final_score,
+            "score": max(0.0, final_score),
             "improvement": public_improvement,
             "hard_pass": True,
             "stress_result": stress_result,
             "data_source": getattr(challenge, "data_source", "unknown"),
+            "public_weight": public_weight,
+            "stress_weight": stress_weight,
         }
 
 
