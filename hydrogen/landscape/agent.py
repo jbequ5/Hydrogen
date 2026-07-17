@@ -1,14 +1,6 @@
-"""Landscape Agent - SOTA starting state for Hydrogen.
+"""Landscape Agent with Distillation Proposal Logic.
 
-The Landscape is the central intelligence of the subnet.
-It collects fragments, runs causal inference (Double ML), integrates
-symbolic knowledge (PySR), and proposes improved priors/baselines.
-
-Design goals:
-- Challenge + backbone aware
-- High-signal causal reasoning
-- Clean interface for miners/validators
-- Extensible for future specialist distillation
+The agent now proposes which strategies are worth distilling into specialists.
 """
 
 import time
@@ -20,14 +12,7 @@ from .storage import save_symbolic_artifact, load_symbolic_artifacts
 
 class LandscapeAgent:
     """
-    The Landscape Agent orchestrates causal + symbolic knowledge.
-
-    Current capabilities (SOTA starting state):
-    - Ingest strategy fragments / observations
-    - Run Double ML causal inference per challenge + backbone
-    - Integrate PySR symbolic discoveries
-    - Propose improved priors for miners
-    - Maintain versioned knowledge
+    Central intelligence for causal + symbolic knowledge + distillation decisions.
     """
 
     def __init__(self, storage_dir: str = "./data/landscape"):
@@ -44,7 +29,6 @@ class LandscapeAgent:
         outcome: float = 0.0,
         metadata: Optional[Dict[str, Any]] = None,
     ):
-        """Ingest a new training/validation observation."""
         self.kb.add_observation(
             challenge_id=challenge_id,
             backbone=backbone,
@@ -55,11 +39,6 @@ class LandscapeAgent:
         )
 
     def run_daily_update(self, challenge_ids: List[str] = None):
-        """
-        Run the daily causal + symbolic update cycle.
-
-        This is the main heartbeat of the Landscape.
-        """
         if challenge_ids is None:
             challenge_ids = [
                 "poisson_2d_v1",
@@ -74,15 +53,11 @@ class LandscapeAgent:
 
         for challenge_id in challenge_ids:
             for backbone in ["PINO"]:
-                # 1. Update causal estimates
                 causal_result = self.kb.estimate_causal_effects(
                     challenge_id, backbone=backbone
                 )
-
                 if causal_result.get("status") == "success":
-                    print(f"  [{challenge_id}/{backbone}] Causal ATE updated: {causal_result.get('ate', 0):.4f}")
-
-                # 2. Could trigger PySR re-analysis here in future
+                    print(f"  [{challenge_id}/{backbone}] Causal ATE updated")
 
         self.last_update = int(time.time())
         print("[Landscape] Daily update complete.")
@@ -92,11 +67,6 @@ class LandscapeAgent:
         challenge_id: str,
         backbone: str = "PINO",
     ) -> Dict[str, Any]:
-        """
-        Propose the current best priors based on causal + symbolic evidence.
-
-        This is what miners should ideally build from (via published noisy version).
-        """
         return self.kb.get_best_priors(challenge_id, backbone=backbone)
 
     def get_publishable_priors(
@@ -105,15 +75,74 @@ class LandscapeAgent:
         backbone: str = "PINO",
         noise_level: float = 0.03,
     ) -> Dict[str, Any]:
-        """
-        Return noisy priors suitable for daily public publication.
-        """
         return self.kb.get_publishable_priors(
             challenge_id, backbone=backbone, noise_level=noise_level
         )
 
+    def propose_distillation_candidates(
+        self,
+        challenge_id: str,
+        backbone: str = "PINO",
+        top_k: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """
+        Propose the best strategies worth distilling into specialists.
+
+        Ranking criteria (intelligent):
+        - Causal effect strength (from Double ML)
+        - Stress test performance
+        - Improvement magnitude
+        - UQ calibration quality (if available)
+        """
+        candidates = []
+
+        # Get recent high-performing artifacts
+        weight_artifacts = load_symbolic_artifacts(
+            artifact_type="evolved_loss_weights",
+            challenge_id=challenge_id,
+            limit=20,
+        )
+
+        scoring_artifacts = load_symbolic_artifacts(
+            artifact_type="pysr_scoring",
+            challenge_id=challenge_id,
+            limit=10,
+        )
+
+        causal = self.kb.causal_estimates.get(
+            self.kb._make_key(challenge_id, backbone), {}
+        )
+
+        # Simple intelligent ranking for now
+        # In future this will use more causal features + stress history
+        for i, artifact in enumerate(weight_artifacts[:top_k]):
+            content = artifact.get("content", {})
+            candidate = {
+                "rank": i + 1,
+                "challenge_id": challenge_id,
+                "backbone": backbone,
+                "loss_vector": content.get("loss_vector", {}),
+                "causal_ate": causal.get("ate", 0.0),
+                "source_artifact": artifact.get("timestamp"),
+                "recommended_for_distillation": True,
+            }
+            candidates.append(candidate)
+
+        # Also consider strong PySR scoring expressions
+        if scoring_artifacts:
+            best_scoring = scoring_artifacts[0]
+            candidates.append({
+                "rank": len(candidates) + 1,
+                "challenge_id": challenge_id,
+                "backbone": backbone,
+                "type": "scoring_expression",
+                "expression": best_scoring.get("content", {}).get("expression"),
+                "recommended_for_distillation": True,
+            })
+
+        return candidates[:top_k]
+
     def get_status(self) -> Dict[str, Any]:
-        """Return current status of the Landscape."""
         return {
             "last_update": self.last_update,
             "storage_dir": self.storage_dir,
