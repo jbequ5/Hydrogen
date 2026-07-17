@@ -1,7 +1,13 @@
-"""Hydrogen Miner - Improved robustness and intelligence."""
+"""Hydrogen Miner with Landscape prior integration.
+
+Miners can now optionally load the latest published (noisy) priors
+from the Landscape to build stronger strategies.
+"""
 
 import time
 import typing
+import json
+import os
 import random
 import bittensor as bt
 
@@ -12,23 +18,53 @@ from hydrogen.miner.strategy_generator import generate_strategy, get_local_valid
 
 class Miner(BaseMinerNeuron):
     """
-    Improved Hydrogen Miner with better local validation and robustness.
+    Improved Hydrogen Miner that can use Landscape-published priors.
     """
 
     def __init__(self, config=None):
         super().__init__(config=config)
         self.local_validation_enabled = True
-        bt.logging.info("Hydrogen Miner initialized (improved robustness).")
+        self.use_landscape_priors = True
+        self.published_priors_dir = "./data/published_priors"
+        bt.logging.info("Hydrogen Miner initialized with Landscape prior support.")
+
+    def _load_latest_priors(self, challenge_id: str, backbone: str = "PINO") -> dict:
+        """Load the latest published (noisy) priors for this challenge."""
+        if not self.use_landscape_priors:
+            return {}
+
+        filename = f"{challenge_id}_{backbone}_daily.json"
+        filepath = os.path.join(self.published_priors_dir, filename)
+
+        if os.path.exists(filepath):
+            try:
+                with open(filepath) as f:
+                    priors = json.load(f)
+                bt.logging.info(f"Loaded published priors for {challenge_id}")
+                return priors.get("loss_vector", {})
+            except Exception as e:
+                bt.logging.warning(f"Failed to load priors: {e}")
+        return {}
 
     async def forward(self, synapse: StrategySynapse) -> StrategySynapse:
         bt.logging.info(f"Received request for challenge: {synapse.challenge_id}")
 
         try:
             if synapse.strategy is None:
-                # Generate strategy using symbolic metadata
+                # Generate base strategy
                 strategy = generate_strategy(synapse.challenge_id)
 
-                # Perform local validation before responding
+                # Try to improve using latest Landscape priors
+                if self.use_landscape_priors:
+                    published_loss = self._load_latest_priors(synapse.challenge_id)
+                    if published_loss:
+                        # Blend published priors with generated strategy
+                        current = strategy.get("pino", {}).get("loss_vector", {})
+                        blended = {**current, **published_loss}  # published takes precedence
+                        strategy.setdefault("pino", {})["loss_vector"] = blended
+                        bt.logging.info("Blended strategy with Landscape published priors")
+
+                # Local validation
                 if self.local_validation_enabled:
                     improvement, hard_pass, gate_details = get_local_validation_score(
                         synapse.challenge_id,
@@ -41,18 +77,16 @@ class Miner(BaseMinerNeuron):
                         bt.logging.info(f"Local validation PASSED. Est. improvement: {improvement:+.4f}")
                         synapse.strategy = strategy
                         synapse.accepted = True
-                        synapse.message = f"Validated locally (est. improvement {improvement:.3f})"
+                        synapse.message = f"Validated (improvement ~{improvement:.3f})"
                     else:
-                        bt.logging.warning("Local validation FAILED gates. Adjusting strategy...")
-                        # Could implement strategy mutation here in the future
+                        bt.logging.warning("Local validation failed gates.")
                         synapse.strategy = strategy
                         synapse.accepted = False
-                        synapse.message = "Local validation failed - strategy may need tuning"
+                        synapse.message = "Local validation failed"
                 else:
-                    # No local validation
                     synapse.strategy = strategy
                     synapse.accepted = True
-                    synapse.message = "Strategy generated (no local validation)"
+                    synapse.message = "Strategy generated"
 
             else:
                 synapse.accepted = True
@@ -62,7 +96,7 @@ class Miner(BaseMinerNeuron):
         except Exception as e:
             bt.logging.error(f"Error in miner forward: {e}")
             synapse.accepted = False
-            synapse.message = f"Internal error: {str(e)}"
+            synapse.message = f"Internal error"
 
         return synapse
 
