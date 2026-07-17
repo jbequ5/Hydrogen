@@ -1,4 +1,4 @@
-"""Hydrogen Validator now supports multiple challenges."""
+"""Hydrogen Validator with full multi-challenge support (Poisson, Darcy, Burgers)."""
 
 import time
 import numpy as np
@@ -13,16 +13,14 @@ class Validator(BaseValidatorNeuron):
     def __init__(self, config=None):
         super().__init__(config=config)
         self.scores = {}
-        self.challenge_history = {}
         self.moving_average_alpha = 0.15
         self.current_challenge_index = 0
-        self.challenge_ids = ["poisson_2d_v1", "darcy_2d_v1"]
-        bt.logging.info("Hydrogen Validator initialized with multi-challenge support.")
+        self.challenge_ids = ["poisson_2d_v1", "darcy_2d_v1", "burgers_v1"]
+        bt.logging.info("Hydrogen Validator initialized with Poisson + Darcy + Burgers.")
 
     async def forward(self):
         bt.logging.info("Starting validation round...")
 
-        # Cycle through challenges
         challenge_id = self.challenge_ids[self.current_challenge_index]
         self.current_challenge_index = (self.current_challenge_index + 1) % len(self.challenge_ids)
 
@@ -109,14 +107,15 @@ class Validator(BaseValidatorNeuron):
 
         results = train_physics_neural_operator(challenge, strategy, epochs=6)
 
-        pde_type = "poisson" if "poisson" in challenge_id else "darcy"
+        pde_type = "burgers" if "burgers" in challenge_id else ("darcy" if "darcy" in challenge_id else "poisson")
         hard_pass, gate_details = evaluate_all_gates(results, pde_type=pde_type)
 
         if not hard_pass:
             return {"score": 0.0, "improvement": 0.0, "hard_pass": False}
 
+        u_key = "u_true" if "u_true" in challenge.stress_data else list(challenge.stress_data.keys())[0]
         u_pred = results["u_pred"]
-        u_true = challenge.stress_data["u_true"][0]
+        u_true = challenge.stress_data[u_key][0]
         submission_error = compute_relative_l2_error(u_pred, u_true)
         improvement = float(torch.log(torch.tensor(baseline_error)) - torch.log(torch.tensor(submission_error)))
 

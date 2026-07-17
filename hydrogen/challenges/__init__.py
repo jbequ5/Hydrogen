@@ -1,14 +1,13 @@
-"""Challenge registry for Hydrogen.
-
-Allows dynamic loading of different PDE challenges.
-"""
+"""Challenge registry for Hydrogen."""
 
 from .poisson_2d import load_challenge as load_poisson
 from .darcy_2d import load_challenge as load_darcy
+from .burgers import load_challenge as load_burgers
 
 CHALLENGE_LOADERS = {
     "poisson_2d_v1": load_poisson,
     "darcy_2d_v1": load_darcy,
+    "burgers_v1": load_burgers,
 }
 
 def load_challenge(challenge_id: str):

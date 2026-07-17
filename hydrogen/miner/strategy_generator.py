@@ -1,4 +1,4 @@
-"""Strategy generation now supports multiple challenges."""
+"""Strategy generation supporting Poisson, Darcy, and Burgers."""
 
 from typing import Dict, Any, Tuple
 import torch
@@ -23,7 +23,7 @@ def generate_strategy(challenge_id: str = "poisson_2d_v1") -> Dict[str, Any]:
 
     return {
         "backbone": "PINO",
-        "resolution": list(challenge.resolution) if hasattr(challenge, 'resolution') else [128, 128],
+        "resolution": list(getattr(challenge, 'resolution', [128, 128])),
         "pino": {
             "loss_vector": suggested_weights,
             "physics_loss_type": "pde_residual",
@@ -35,7 +35,7 @@ def generate_strategy(challenge_id: str = "poisson_2d_v1") -> Dict[str, Any]:
         "curriculum_learning": {
             "enabled": True,
             "start_resolution": [64, 64],
-            "end_resolution": [128, 128],
+            "end_resolution": list(getattr(challenge, 'resolution', [128, 128])),
             "ramp_epochs": 30,
         },
         "uq_config": {
@@ -60,7 +60,7 @@ def get_local_validation_score(
             results = train_physics_neural_operator(challenge, strategy, epochs=quick_epochs)
         else:
             stress = challenge.stress_data
-            u_true = stress["u_true"][0]
+            u_true = stress.get("u_true", stress.get("u"))[0] if "u_true" in stress else stress[list(stress.keys())[0]][0]
             noise_level = strategy.get("noise_level", 0.012)
             u_pred = u_true + noise_level * torch.randn_like(u_true)
 
@@ -74,11 +74,11 @@ def get_local_validation_score(
                 "dE_dt": torch.tensor([-0.0002]),
             }
 
-        # Determine pde_type for gates
-        pde_type = "poisson" if "poisson" in challenge_id else "darcy"
+        pde_type = "burgers" if "burgers" in challenge_id else ("darcy" if "darcy" in challenge_id else "poisson")
         hard_pass, gate_details = evaluate_all_gates(results, pde_type=pde_type)
 
-        submission_error = compute_relative_l2_error(results["u_pred"], challenge.stress_data["u_true"][0])
+        u_true_key = "u_true" if "u_true" in challenge.stress_data else list(challenge.stress_data.keys())[0]
+        submission_error = compute_relative_l2_error(results["u_pred"], challenge.stress_data[u_true_key][0])
         baseline_error = challenge.baseline_error
         improvement = float(torch.log(torch.tensor(baseline_error)) - torch.log(torch.tensor(submission_error)))
 
