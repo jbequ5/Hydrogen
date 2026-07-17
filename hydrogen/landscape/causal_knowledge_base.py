@@ -1,14 +1,15 @@
-"""Causal Knowledge Base (Challenge + Backbone aware, high-signal).
+"""Causal Knowledge Base with publishable (noisy) leading priors.
 
-Designed to extract maximum causal signal while respecting that
-effects are challenge-specific and often backbone-specific.
+Designed so the full Landscape stays proprietary, while still allowing
+miners to build off the current leader in a controlled way.
 
-Miners can query this to get the current best priors/strategy components.
+Publishing strategy: Daily per challenge + backbone with added noise.
 """
 
 import json
 import os
 import time
+import random
 from typing import Dict, Any, List, Optional, Tuple
 
 import numpy as np
@@ -33,17 +34,16 @@ class CausalKnowledgeBase:
     """
     Challenge- and backbone-aware causal knowledge base.
 
-    Uses Double ML (when available) + PySR to build high-signal causal understanding.
-    Miners and validators can query it for the current best priors.
+    Supports publishing noisy versions of the current best priors daily.
+    Full access remains proprietary. Miners only see the published version.
     """
 
     def __init__(self, storage_dir: str = "./data/landscape"):
         self.storage_dir = storage_dir
         os.makedirs(storage_dir, exist_ok=True)
-        # Keyed by (challenge_id, backbone)
         self.causal_estimates: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
-    def _make_key(self, challenge_id: str, backbone: str = "default") -> Tuple[str, str]:
+    def _make_key(self, challenge_id: str, backbone: str = "PINO") -> Tuple[str, str]:
         return (challenge_id, backbone)
 
     def add_observation(
@@ -55,9 +55,6 @@ class CausalKnowledgeBase:
         outcome: float = 0.0,
         metadata: Optional[Dict[str, Any]] = None,
     ):
-        """
-        Add an observation. Strongly recommended to include backbone.
-        """
         features = features or {}
         treatment = treatment or {}
 
@@ -85,11 +82,6 @@ class CausalKnowledgeBase:
         treatment_key: str = "pde_residual_weight",
         min_samples: int = 30,
     ) -> Dict[str, Any]:
-        """
-        Estimate causal effect using Double ML, conditioned on challenge + backbone.
-
-        We are careful not to pool across very different regimes.
-        """
         key = self._make_key(challenge_id, backbone)
         artifacts = load_symbolic_artifacts(
             artifact_type="causal_observation",
@@ -97,13 +89,12 @@ class CausalKnowledgeBase:
             limit=1000,
         )
 
-        # Filter to this backbone when possible
         filtered = [
             a for a in artifacts
             if a.get("content", {}).get("backbone", "default") == backbone
         ]
         if len(filtered) < min_samples:
-            filtered = artifacts  # fallback to all if not enough backbone-specific data
+            filtered = artifacts
 
         if len(filtered) < min_samples:
             return {
@@ -113,7 +104,6 @@ class CausalKnowledgeBase:
                 "backbone": backbone,
             }
 
-        # Build arrays
         X, T, Y = [], [], []
         for art in filtered:
             content = art.get("content", {})
@@ -182,34 +172,22 @@ class CausalKnowledgeBase:
         challenge_id: str,
         backbone: str = "PINO",
     ) -> Dict[str, Any]:
-        """
-        Return the current best known priors for this challenge + backbone.
-
-        This is what miners should call to get the current 'winning' strategy components.
-        """
         key = self._make_key(challenge_id, backbone)
-
-        # Get latest causal estimate
         causal = self.causal_estimates.get(key, {})
 
-        # Get recent PySR scoring expressions
         scoring = load_symbolic_artifacts(
             artifact_type="pysr_scoring",
             challenge_id=challenge_id,
             limit=5,
         )
-
-        # Get recent evolved loss weights
         weights = load_symbolic_artifacts(
             artifact_type="evolved_loss_weights",
             challenge_id=challenge_id,
             limit=5,
         )
 
-        # Build actionable priors
         best_loss_vector = {}
         if weights:
-            # Take the most recent evolved weights if available
             best_loss_vector = weights[0].get("content", {}).get("loss_vector", {})
 
         best_scoring_expr = None
@@ -225,6 +203,36 @@ class CausalKnowledgeBase:
             "last_updated": causal.get("timestamp") or int(time.time()),
         }
 
+    def get_publishable_priors(
+        self,
+        challenge_id: str,
+        backbone: str = "PINO",
+        noise_level: float = 0.03,
+    ) -> Dict[str, Any]:
+        """
+        Return a noisy version of the current best priors.
+
+        This is what should be published daily per challenge + backbone.
+        The noise prevents exact copying while still giving miners a strong
+        starting point (they are incentivized to improve upon it).
+        """
+        best = self.get_best_priors(challenge_id, backbone=backbone)
+
+        # Add noise to loss vector
+        noisy_loss = {}
+        for k, v in best.get("recommended_loss_vector", {}).items():
+            noise = random.gauss(0, noise_level)
+            noisy_loss[k] = max(0.05, v * (1 + noise))
+
+        return {
+            "challenge_id": challenge_id,
+            "backbone": backbone,
+            "loss_vector": noisy_loss,
+            "scoring_expression": best.get("recommended_scoring_expression"),
+            "noise_level": noise_level,
+            "published_at": int(time.time()),
+            "based_on": best.get("last_updated"),
+        }
+
     def update_from_observations(self, challenge_id: str, backbone: str = "PINO"):
-        """Re-estimate causal effects for this challenge + backbone."""
         return self.estimate_causal_effects(challenge_id, backbone=backbone)
