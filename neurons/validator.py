@@ -1,4 +1,7 @@
-"""Validator that saves PySR discoveries to the shared Landscape storage."""
+"""Hydrogen Validator with integrated stress testing.
+
+Now runs hidden procedural stress tests with hard gates.
+"""
 
 import time
 import numpy as np
@@ -8,13 +11,7 @@ import bittensor as bt
 from hydrogen.base.validator import BaseValidatorNeuron
 from hydrogen.protocol import StrategySynapse
 from hydrogen.challenges import load_challenge
-from hydrogen.landscape.storage import save_symbolic_artifact
-
-try:
-    from pysr import PySRRegressor
-    PYSR_AVAILABLE = True
-except ImportError:
-    PYSR_AVAILABLE = False
+from hydrogen.physics.stress import run_stress_test
 
 
 class Validator(BaseValidatorNeuron):
@@ -32,8 +29,7 @@ class Validator(BaseValidatorNeuron):
             "ns_2d_laminar_v1",
         ]
         self.use_benchmark = True
-        self.use_pysr_scoring = PYSR_AVAILABLE
-        bt.logging.info("Hydrogen Validator saving PySR artifacts to Landscape storage.")
+        bt.logging.info("Hydrogen Validator with hidden stress testing enabled.")
 
     async def forward(self):
         bt.logging.info("Starting validation round...")
@@ -122,8 +118,10 @@ class Validator(BaseValidatorNeuron):
         challenge = load_challenge(challenge_id, use_benchmark=self.use_benchmark)
         baseline_error = challenge.baseline_error
 
+        # Train on public data
         results = train_physics_neural_operator(challenge, strategy, epochs=6)
 
+        # Determine pde_type
         if "ns_2d" in challenge_id or "navier" in challenge_id:
             pde_type = "navier_stokes"
         elif "burgers" in challenge_id:
@@ -137,69 +135,47 @@ class Validator(BaseValidatorNeuron):
         else:
             pde_type = "poisson"
 
-        hard_pass, gate_details = evaluate_all_gates(results, pde_type=pde_type)
-
-        if not hard_pass:
-            return {"score": 0.0, "improvement": 0.0, "hard_pass": False}
-
-        u_key = next((k for k in ["u_true", "velocity_true", "ux_true", "u"] if k in challenge.stress_data), list(challenge.stress_data.keys())[0])
+        # Public holdout evaluation
+        u_key = next(
+            (k for k in ["u_true", "velocity_true", "ux_true", "u"] if k in challenge.stress_data),
+            list(challenge.stress_data.keys())[0]
+        )
         u_true = challenge.stress_data[u_key][0]
         if u_true.dim() == 3:
             u_true = u_true[0]
+
         u_pred = results.get("u_pred", results.get("velocity_pred", torch.zeros_like(u_true)))
+        public_error = compute_relative_l2_error(u_pred, u_true)
+        public_improvement = float(torch.log(torch.tensor(baseline_error)) - torch.log(torch.tensor(public_error)))
 
-        submission_error = compute_relative_l2_error(u_pred, u_true)
-        improvement = float(torch.log(torch.tensor(baseline_error)) - torch.log(torch.tensor(submission_error)))
+        # === Hidden Stress Test ===
+        stress_result = run_stress_test(
+            challenge_id=challenge_id,
+            results=results,
+            u_pred=u_pred,
+            u_true=u_true,
+            pde_type=pde_type,
+            difficulty=1.0,
+        )
 
-        final_score = max(0.0, improvement)
+        if not stress_result["hard_pass"]:
+            bt.logging.warning(f"{challenge_id} stress test HARD FAIL for strategy")
+            return {
+                "score": 0.0,
+                "improvement": 0.0,
+                "hard_pass": False,
+                "stress_result": stress_result,
+            }
 
-        # PySR regression on gate outputs + improvement
-        if self.use_pysr_scoring and PYSR_AVAILABLE and gate_details:
-            try:
-                gate_values = []
-                gate_names = []
-                for gate_name, value in gate_details.items():
-                    if isinstance(value, (int, float, bool)):
-                        gate_values.append(float(value))
-                        gate_names.append(gate_name)
-
-                if len(gate_values) >= 2:
-                    X = np.array([gate_values])
-                    y = np.array([improvement])
-
-                    model = PySRRegressor(
-                        niterations=12,
-                        binary_operators=["+", "*"],
-                        unary_operators=["exp"],
-                        verbosity=0,
-                        random_state=42,
-                    )
-                    model.fit(X, y)
-
-                    predicted = model.predict(X)[0]
-                    final_score = max(0.0, float(predicted))
-
-                    # Save discovered expression to shared Landscape storage
-                    artifact = {
-                        "expression": str(model.get_best()),
-                        "gate_names": gate_names,
-                        "predicted_improvement": float(predicted),
-                        "actual_improvement": improvement,
-                    }
-                    save_symbolic_artifact(
-                        artifact_type="pysr_scoring",
-                        challenge_id=challenge_id,
-                        content=artifact,
-                        metadata={"source": "validator"},
-                    )
-                    bt.logging.info(f"Saved PySR scoring artifact for {challenge_id}")
-            except Exception as e:
-                bt.logging.debug(f"PySR scoring failed: {e}")
+        # Combine public improvement + stress performance
+        stress_score = stress_result.get("final_stress_score", 0.5)
+        final_score = max(0.0, public_improvement * 0.6 + stress_score * 0.4)
 
         return {
             "score": final_score,
-            "improvement": improvement,
+            "improvement": public_improvement,
             "hard_pass": True,
+            "stress_result": stress_result,
             "data_source": getattr(challenge, "data_source", "unknown"),
         }
 
