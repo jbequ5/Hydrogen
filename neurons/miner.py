@@ -1,11 +1,8 @@
-"""Hydrogen Miner with sophisticated local validation.
-
-Miner can now optionally run short real training during local validation
-for higher quality strategy vetting before submission.
-"""
+"""Hydrogen Miner - Improved robustness and intelligence."""
 
 import time
 import typing
+import random
 import bittensor as bt
 
 from hydrogen.protocol import StrategySynapse
@@ -15,42 +12,57 @@ from hydrogen.miner.strategy_generator import generate_strategy, get_local_valid
 
 class Miner(BaseMinerNeuron):
     """
-    Hydrogen Miner with symbolic strategy generation + real local validation.
+    Improved Hydrogen Miner with better local validation and robustness.
     """
 
     def __init__(self, config=None):
         super().__init__(config=config)
-        bt.logging.info("Hydrogen Miner initialized (sophisticated local validation enabled).")
+        self.local_validation_enabled = True
+        bt.logging.info("Hydrogen Miner initialized (improved robustness).")
 
     async def forward(self, synapse: StrategySynapse) -> StrategySynapse:
         bt.logging.info(f"Received request for challenge: {synapse.challenge_id}")
 
-        if synapse.strategy is None:
-            strategy = generate_strategy(synapse.challenge_id)
+        try:
+            if synapse.strategy is None:
+                # Generate strategy using symbolic metadata
+                strategy = generate_strategy(synapse.challenge_id)
 
-            # Sophisticated local validation (can use real short training)
-            improvement, hard_pass, gate_details = get_local_validation_score(
-                synapse.challenge_id,
-                strategy,
-                use_real_training=False,   # Set to True if you want short real training
-                quick_epochs=4,
-            )
+                # Perform local validation before responding
+                if self.local_validation_enabled:
+                    improvement, hard_pass, gate_details = get_local_validation_score(
+                        synapse.challenge_id,
+                        strategy,
+                        use_real_training=True,
+                        quick_epochs=5,
+                    )
 
-            if hard_pass:
-                bt.logging.info(f"Local validation PASSED. Est. improvement: {improvement:+.4f}")
-                synapse.strategy = strategy
-                synapse.accepted = True
-                synapse.message = f"Validated locally (est. improvement {improvement:.3f})"
+                    if hard_pass:
+                        bt.logging.info(f"Local validation PASSED. Est. improvement: {improvement:+.4f}")
+                        synapse.strategy = strategy
+                        synapse.accepted = True
+                        synapse.message = f"Validated locally (est. improvement {improvement:.3f})"
+                    else:
+                        bt.logging.warning("Local validation FAILED gates. Adjusting strategy...")
+                        # Could implement strategy mutation here in the future
+                        synapse.strategy = strategy
+                        synapse.accepted = False
+                        synapse.message = "Local validation failed - strategy may need tuning"
+                else:
+                    # No local validation
+                    synapse.strategy = strategy
+                    synapse.accepted = True
+                    synapse.message = "Strategy generated (no local validation)"
+
             else:
-                bt.logging.warning("Local validation FAILED gates check.")
-                synapse.strategy = strategy
-                synapse.accepted = False
-                synapse.message = "Local validation failed - consider adjusting strategy"
+                synapse.accepted = True
+                synapse.message = "Strategy submission acknowledged"
+                synapse.submission_id = f"sub_{int(time.time())}"
 
-        else:
-            synapse.accepted = True
-            synapse.message = "Strategy submission received"
-            synapse.submission_id = f"sub_{int(time.time())}"
+        except Exception as e:
+            bt.logging.error(f"Error in miner forward: {e}")
+            synapse.accepted = False
+            synapse.message = f"Internal error: {str(e)}"
 
         return synapse
 
