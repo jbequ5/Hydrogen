@@ -1,7 +1,8 @@
-"""Hydrogen Validator with intelligent public vs stress weighting.
+"""Hydrogen Validator with integrated emission mechanics (75/25 model).
 
-As public performance improves, we gradually put more weight on hidden stress tests.
-This creates a natural curriculum: first learn to fit, then learn to generalize.
+- Tracks leaders per challenge
+- Detects breakthroughs
+- Prepares for decaying Top-2 stipend + breakthrough bounties
 """
 
 import time
@@ -13,6 +14,11 @@ from hydrogen.base.validator import BaseValidatorNeuron
 from hydrogen.protocol import StrategySynapse
 from hydrogen.challenges import load_challenge
 from hydrogen.physics.stress import run_stress_test
+from hydrogen.emission.mechanics import (
+    update_leaderboard,
+    is_breakthrough,
+    get_or_create_state,
+)
 
 
 class Validator(BaseValidatorNeuron):
@@ -31,10 +37,11 @@ class Validator(BaseValidatorNeuron):
         ]
         self.use_benchmark = True
 
-        # Intelligent weighting: start favoring public, increase stress weight over time
+        # Emission config
         self.base_stress_weight = 0.35
         self.max_stress_weight = 0.65
-        bt.logging.info("Hydrogen Validator with adaptive stress weighting enabled.")
+
+        bt.logging.info("Hydrogen Validator with emission tracking enabled (75/25 model).")
 
     async def forward(self):
         bt.logging.info("Starting validation round...")
@@ -171,16 +178,20 @@ class Validator(BaseValidatorNeuron):
 
         stress_score = stress_result.get("final_stress_score", 0.5)
 
-        # === Intelligent Adaptive Weighting ===
-        # As public performance gets better (lower baseline_error or high public_improvement),
-        # we trust the hidden stress test more.
-        # Simple heuristic: higher public_improvement → slightly higher stress weight
+        # === Adaptive weighting ===
         stress_weight = self.base_stress_weight + min(0.25, public_improvement * 0.8)
         stress_weight = min(self.max_stress_weight, max(self.base_stress_weight, stress_weight))
-
         public_weight = 1.0 - stress_weight
 
         final_score = (public_improvement * public_weight) + (stress_score * stress_weight)
+
+        # === Emission Tracking ===
+        hotkey = None  # Will be set by caller in real flow
+        # For now we log — full hotkey tracking happens in forward()
+        was_breakthrough, msg = update_leaderboard(challenge_id, "unknown", stress_score)
+
+        if was_breakthrough:
+            bt.logging.warning(f"🚀 BREAKTHROUGH on {challenge_id}: {msg}")
 
         return {
             "score": max(0.0, final_score),
