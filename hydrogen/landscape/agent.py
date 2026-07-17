@@ -1,6 +1,6 @@
-"""Landscape Agent with Distillation Proposal Logic.
+"""Landscape Agent with integrated distillation pipeline.
 
-The agent now proposes which strategies are worth distilling into specialists.
+Now supports end-to-end proposal → distillation → regression testing.
 """
 
 import time
@@ -8,11 +8,15 @@ from typing import Dict, Any, List, Optional
 
 from .causal_knowledge_base import CausalKnowledgeBase
 from .storage import save_symbolic_artifact, load_symbolic_artifacts
+from hydrogen.specialist.distillation import (
+    distill_strategy_to_specialist,
+    regression_test_specialist,
+)
 
 
 class LandscapeAgent:
     """
-    Central intelligence for causal + symbolic knowledge + distillation decisions.
+    Central intelligence layer with causal reasoning and specialist distillation.
     """
 
     def __init__(self, storage_dir: str = "./data/landscape"):
@@ -85,18 +89,8 @@ class LandscapeAgent:
         backbone: str = "PINO",
         top_k: int = 3,
     ) -> List[Dict[str, Any]]:
-        """
-        Propose the best strategies worth distilling into specialists.
-
-        Ranking criteria (intelligent):
-        - Causal effect strength (from Double ML)
-        - Stress test performance
-        - Improvement magnitude
-        - UQ calibration quality (if available)
-        """
         candidates = []
 
-        # Get recent high-performing artifacts
         weight_artifacts = load_symbolic_artifacts(
             artifact_type="evolved_loss_weights",
             challenge_id=challenge_id,
@@ -113,8 +107,6 @@ class LandscapeAgent:
             self.kb._make_key(challenge_id, backbone), {}
         )
 
-        # Simple intelligent ranking for now
-        # In future this will use more causal features + stress history
         for i, artifact in enumerate(weight_artifacts[:top_k]):
             content = artifact.get("content", {})
             candidate = {
@@ -128,7 +120,6 @@ class LandscapeAgent:
             }
             candidates.append(candidate)
 
-        # Also consider strong PySR scoring expressions
         if scoring_artifacts:
             best_scoring = scoring_artifacts[0]
             candidates.append({
@@ -141,6 +132,70 @@ class LandscapeAgent:
             })
 
         return candidates[:top_k]
+
+    def distill_top_candidates(
+        self,
+        challenge_id: str,
+        backbone: str = "PINO",
+        top_k: int = 2,
+    ) -> List[Dict[str, Any]]:
+        """
+        End-to-end flow:
+        1. Propose top candidates
+        2. Distill them into specialists
+        3. Run regression testing
+        4. Register successful specialists
+        """
+        print(f"[Landscape] Distilling top candidates for {challenge_id}...")
+
+        candidates = self.propose_distillation_candidates(
+            challenge_id, backbone=backbone, top_k=top_k
+        )
+
+        distilled_specialists = []
+
+        for candidate in candidates:
+            if candidate.get("type") == "scoring_expression":
+                # For now we skip pure scoring expressions
+                continue
+
+            # Create a minimal strategy dict from the candidate
+            strategy = {
+                "backbone": backbone,
+                "pino": {
+                    "loss_vector": candidate.get("loss_vector", {})
+                },
+            }
+
+            # Distill
+            specialist = distill_strategy_to_specialist(
+                challenge_id=challenge_id,
+                strategy=strategy,
+            )
+
+            # Regression test
+            test_result = regression_test_specialist(
+                specialist=specialist,
+                challenge_id=challenge_id,
+            )
+
+            specialist["regression_test"] = test_result
+
+            if test_result.get("regression_passed"):
+                print(f"  ✓ Specialist {specialist['specialist_id']} passed regression")
+                distilled_specialists.append(specialist)
+
+                # Register in storage
+                save_symbolic_artifact(
+                    artifact_type="specialist",
+                    challenge_id=challenge_id,
+                    content=specialist,
+                    metadata={"source": "LandscapeAgent"},
+                )
+            else:
+                print(f"  ✗ Specialist {specialist['specialist_id']} failed regression")
+
+        return distilled_specialists
 
     def get_status(self) -> Dict[str, Any]:
         return {
