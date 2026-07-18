@@ -1,13 +1,8 @@
-"""Unified Trainer for Hydrogen.
-
-Supports multiple backbones via the backbone registry
-(NeuralOperator + PhysicsNeMo).
-"""
+"""Unified Trainer with validation support."""
 
 from typing import Dict, Any, Optional
 
 import torch
-
 import torch.nn as nn
 
 from hydrogen.backbones import get_backbone
@@ -19,9 +14,6 @@ def get_model(
     out_channels: int = 1,
     **kwargs,
 ) -> nn.Module:
-    """
-    Factory function to get a model from the backbone registry.
-    """
     BackboneClass = get_backbone(backbone)
     return BackboneClass(in_channels=in_channels, out_channels=out_channels, **kwargs)
 
@@ -29,15 +21,12 @@ def get_model(
 def train_model(
     model: nn.Module,
     train_loader,
-    val_loader=None,
+    val_loader: Optional[Any] = None,
     epochs: int = 50,
     lr: float = 0.001,
     device: str = "cuda" if torch.cuda.is_available() else "cpu",
     physics_loss_fn: Optional[callable] = None,
 ) -> Dict[str, Any]:
-    """
-    Generic training loop that works with any backbone.
-    """
     model = model.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
@@ -53,7 +42,6 @@ def train_model(
 
             loss = torch.nn.functional.mse_loss(pred, y)
 
-            # Optional physics loss
             if physics_loss_fn is not None:
                 loss = loss + physics_loss_fn(pred, x)
 
@@ -66,7 +54,7 @@ def train_model(
         avg_train = total_loss / len(train_loader)
         history["train_loss"].append(avg_train)
 
-        # Validation
+        # Validation loop
         if val_loader is not None:
             model.eval()
             val_loss = 0.0
@@ -75,9 +63,13 @@ def train_model(
                     x, y = batch[0].to(device), batch[1].to(device)
                     pred = model(x)
                     val_loss += torch.nn.functional.mse_loss(pred, y).item()
-            history["val_loss"].append(val_loss / len(val_loader))
+            avg_val = val_loss / len(val_loader)
+            history["val_loss"].append(avg_val)
 
-        if (epoch + 1) % 10 == 0:
-            print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_train:.6f}")
+            if (epoch + 1) % 10 == 0:
+                print(f"Epoch {epoch+1}/{epochs} - Train: {avg_train:.6f} | Val: {avg_val:.6f}")
+        else:
+            if (epoch + 1) % 10 == 0:
+                print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_train:.6f}")
 
     return {"model": model, "history": history}
