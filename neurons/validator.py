@@ -1,6 +1,7 @@
-"""Hydrogen Validator (Final Polish)
+"""Hydrogen Validator with ChallengeWinnerTracker integration.
 
-Includes monitoring, dry-run mode, VTrust signals, and clean structure.
+Minos-style round/challenge winner heavy weighting with exponential decay
+and participation dust.
 """
 
 import time
@@ -8,6 +9,7 @@ import time
 import bittensor as bt
 
 from neurons.scoring.hydrogen_scorer import HydrogenScorer
+from neurons.scoring.challenge_winner_tracker import ChallengeWinnerTracker
 
 
 class Validator:
@@ -18,6 +20,8 @@ class Validator:
         self.metagraph = bt.metagraph(netuid=config.netuid)
 
         self.scorer = HydrogenScorer(config)
+        self.tracker = ChallengeWinnerTracker(decay_factor=0.85)
+
         self.active_challenges = getattr(config, "active_challenges", None) or [
             "poisson_2d_v1", "darcy_2d_v1", "burgers_v1"
         ]
@@ -33,11 +37,11 @@ class Validator:
 
                 if scores:
                     if self.dry_run:
-                        bt.logging.info(f"[DRY RUN] Scores computed: {scores}")
+                        bt.logging.info(f"[DRY RUN] Scores computed")
                     else:
-                        self._set_weights(scores)
+                        self._set_weights()
 
-                self._log_monitoring(scores)
+                self._log_monitoring()
 
             except Exception as e:
                 bt.logging.error(f"Validator error: {e}")
@@ -46,55 +50,78 @@ class Validator:
 
     def _evaluate_miners(self) -> dict:
         scores = {}
-        evaluated = 0
 
         for uid in self.metagraph.uids:
             hotkey = self.metagraph.hotkeys[uid]
             strategy = self._get_strategy_for_uid(uid)
 
             if not strategy:
-                scores[uid] = 0.0
                 continue
 
             try:
-                score = self.scorer.score_strategy(uid, hotkey, strategy)
-                scores[uid] = score
-                evaluated += 1
+                # Scorer returns rich data including per-challenge combined score
+                result = self.scorer.score_strategy(uid, hotkey, strategy)
+
+                # Update tracker per challenge
+                challenge_id = strategy.get("challenge_id", "default")
+                combined_score = result.get("combined_score", 0.0)
+
+                self.tracker.update(hotkey, challenge_id, combined_score)
+
+                scores[uid] = combined_score
+
             except Exception as e:
                 bt.logging.warning(f"Failed to score uid {uid}: {e}")
-                scores[uid] = 0.0
 
         return scores
 
-    def _set_weights(self, scores: dict):
-        uids = list(scores.keys())
-        weights = list(scores.values())
+    def _set_weights(self):
+        # Use tracker to compute winner-heavy + dust weights
+        weights = self.tracker.get_weights(
+            active_challenges=self.active_challenges,
+            winner_weight=0.65,
+            dust_top_n=8,
+            dust_decay=0.6,
+        )
 
-        weights_tensor = bt.tensor(weights, dtype=bt.float32)
-        weights_tensor = weights_tensor / weights_tensor.sum()
+        # Convert to UID-based arrays for set_weights
+        uids = []
+        weight_values = []
+
+        for hotkey, weight in weights.items():
+            if hotkey in self.metagraph.hotkeys:
+                uid = self.metagraph.hotkeys.index(hotkey)
+                uids.append(uid)
+                weight_values.append(weight)
+
+        if not uids:
+            bt.logging.warning("No valid hotkeys for weight submission")
+            return
+
+        # Normalize
+        total = sum(weight_values)
+        if total > 0:
+            weight_values = [w / total for w in weight_values]
 
         self.subtensor.set_weights(
             uids=uids,
-            weights=weights_tensor,
+            weights=weight_values,
             version_key=self.config.version_key,
             wait_for_finalization=True,
         )
-        bt.logging.info(f"Weights submitted for {len(uids)} miners")
 
-    def _log_monitoring(self, scores: dict):
-        if not scores:
-            return
+        bt.logging.info(f"Weights submitted for {len(uids)} miners (winner-heavy + dust)")
 
-        avg_score = sum(scores.values()) / len(scores)
-        bt.logging.info(f"Average score: {avg_score:.4f} | Evaluated: {len(scores)} miners")
-
-        if avg_score > 0.08:
-            bt.logging.info("Strong average score — positive for VTrust")
-        elif avg_score < 0.04:
-            bt.logging.warning("Low average score — may negatively impact VTrust")
+    def _log_monitoring(self):
+        stats = self.tracker.get_stats()
+        bt.logging.info(
+            f"Challenges tracked: {stats['tracked_challenges']} | "
+            f"Current leaders: {stats['current_leaders']} | "
+            f"Miners tracked: {stats['miners_tracked']}"
+        )
 
     def _get_strategy_for_uid(self, uid: int) -> dict:
-        # TODO: Replace with real strategy retrieval logic
+        # TODO: Replace with real strategy retrieval
         return {
             "backbone": "physicsnemo_fno",
             "challenge_id": self.active_challenges[uid % len(self.active_challenges)],
