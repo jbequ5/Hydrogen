@@ -1,6 +1,7 @@
 """SOTA Strategy Generator for Hydrogen.
 
 Produces rich, validator-complete strategy JSONs.
+Miners control training config — validators control data splits.
 """
 
 from typing import Dict, Any, Optional
@@ -16,7 +17,8 @@ def generate_strategy(
     use_uq: bool = True,
 ) -> Dict[str, Any]:
     """
-    Generates a rich, SOTA strategy JSON that the validator can fully consume.
+    Generates a rich, SOTA strategy JSON focused on training configuration.
+    Data splits are controlled exclusively by the validator.
     """
     try:
         challenge = load_challenge(challenge_id)
@@ -64,11 +66,6 @@ def generate_strategy(
             "num_members": 4,
             "calibration_target": 0.92,
             "dropout_rate": 0.05,
-        },
-        "data_split": {
-            "train": "benchmark_train",
-            "stress_holdout": "procedural_hidden",
-            "benchmark": "benchmark_test",
         },
         "auto_loss_weights": True,
         "physics_gate_strictness": 0.9,
