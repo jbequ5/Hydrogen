@@ -1,8 +1,8 @@
-"""Stress Test Engine with Weak Local Version for Miners.
+"""High-Level Stress Testing Engine for Hydrogen.
 
-The full stress test (used by validators) is hidden and strong.
-This weak local version gives miners useful signal without letting them
-game the hidden test.
+Significantly upgraded for rigor and anti-gaming strength.
+Focus on strong physics violation detection, long-horizon stability,
+and challenging OOD conditions.
 """
 
 import hashlib
@@ -37,23 +37,33 @@ def generate_stress_conditions(
         "seed": seed,
     }
 
-    conditions["time_horizon_multiplier"] = 1.5 + difficulty * rng.uniform(0.5, 2.5)
-    conditions["parameter_perturbation"] = rng.uniform(0.1, 0.7) * difficulty
-    conditions["noise_level"] = rng.uniform(0.005, 0.05) * difficulty
-    conditions["resolution_scale"] = rng.choice([1.0, 1.5, 2.0])
+    conditions["time_horizon_multiplier"] = 2.0 + difficulty * rng.uniform(0.8, 3.0)
+    conditions["parameter_perturbation"] = rng.uniform(0.15, 0.8) * difficulty
+    conditions["noise_level"] = rng.uniform(0.008, 0.06) * difficulty
+    conditions["resolution_scale"] = rng.choice([1.0, 1.5, 2.0, 2.5])
 
     if "ns_2d" in challenge_id or "navier" in challenge_id:
-        conditions["reynolds_multiplier"] = 1.3 + rng.uniform(0.4, 2.2) * difficulty
-        conditions["forcing_perturbation"] = rng.uniform(0.05, 0.3)
-        conditions["divergence_tolerance"] = 1e-3 * (1 + difficulty * 0.5)
+        conditions["reynolds_multiplier"] = 1.5 + rng.uniform(0.6, 2.8) * difficulty
+        conditions["forcing_perturbation"] = rng.uniform(0.08, 0.35)
+        conditions["divergence_tolerance"] = 5e-4 * (1 + difficulty * 0.8)
     elif "burgers" in challenge_id:
-        conditions["viscosity_multiplier"] = rng.uniform(0.2, 3.0) * difficulty
+        conditions["viscosity_multiplier"] = rng.uniform(0.15, 4.0) * difficulty
     elif "darcy" in challenge_id:
-        conditions["permeability_contrast"] = 80 + rng.uniform(30, 500) * difficulty
+        conditions["permeability_contrast"] = 120 + rng.uniform(50, 600) * difficulty
     elif "heat" in challenge_id:
-        conditions["diffusivity_multiplier"] = rng.uniform(0.3, 2.5) * difficulty
+        conditions["diffusivity_multiplier"] = rng.uniform(0.25, 3.5) * difficulty
 
     return conditions
+
+
+def compute_divergence(u: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
+    """Simple finite difference divergence for 2D velocity fields."""
+    du_dx = u[:, 1:] - u[:, :-1]
+    dv_dy = v[1:, :] - v[:-1, :]
+    # Pad to match shapes
+    du_dx = torch.nn.functional.pad(du_dx, (0, 1, 0, 0))
+    dv_dy = torch.nn.functional.pad(dv_dy, (0, 0, 0, 1))
+    return du_dx + dv_dy
 
 
 def run_hard_gates(
@@ -68,34 +78,42 @@ def run_hard_gates(
 
     difficulty = conditions.get("difficulty", 1.0)
 
+    # === Navier-Stokes Specific Hard Gates ===
     if pde_type == "navier_stokes":
-        if "velocity" in results or "u_pred" in results:
-            div_norm = results.get("divergence_norm", torch.tensor(0.0))
-            if div_norm > conditions.get("divergence_tolerance", 1e-3):
-                gate_details["divergence_free"] = False
-                return False, gate_details
+        # Divergence-free check
+        if "velocity" in results:
+            vel = results["velocity"]
+            if vel.dim() == 4 and vel.shape[1] >= 2:
+                div = compute_divergence(vel[:, 0], vel[:, 1])
+                max_div = torch.max(torch.abs(div))
+                if max_div > conditions.get("divergence_tolerance", 5e-4):
+                    gate_details["divergence_free"] = False
+                    return False, gate_details
 
+        # Long-horizon kinetic energy stability
         if "energy_trajectory" in results:
             energy = results["energy_trajectory"]
-            if len(energy) > 5:
+            if len(energy) > 10:
                 drift = abs(energy[-1] - energy[0]) / (abs(energy[0]) + 1e-8)
-                if drift > 0.08 * difficulty:
+                if drift > 0.06 * difficulty:
                     gate_details["ns_long_term_stability"] = False
                     return False, gate_details
 
+    # === Burgers Specific Hard Gates ===
     if pde_type == "burgers":
         if "energy_trajectory" in results:
             energy = results["energy_trajectory"]
-            if len(energy) > 5:
-                if torch.any(energy < -0.1):
+            if len(energy) > 8:
+                if torch.any(energy < -0.05):
                     gate_details["burgers_negative_energy"] = False
                     return False, gate_details
 
+    # General long-horizon stability under stress
     if "energy_trajectory" in results:
         energy = results["energy_trajectory"]
-        if len(energy) > 8:
+        if len(energy) > 12:
             drift = abs(energy[-1] - energy[0]) / (abs(energy[0]) + 1e-8)
-            if drift > 0.12 * difficulty:
+            if drift > 0.10 * difficulty:
                 gate_details["stress_rollout_stability"] = False
                 return False, gate_details
 
@@ -115,22 +133,23 @@ def compute_stress_metrics(
     metrics["stress_l2_error"] = base_error
 
     param_pert = conditions.get("parameter_perturbation", 0.2)
-    metrics["generalization_gap"] = base_error * (1 + param_pert)
-    metrics["ood_sensitivity"] = base_error * conditions.get("noise_level", 0.02) * 12
+    metrics["generalization_gap"] = base_error * (1 + param_pert * 1.5)
+    metrics["ood_sensitivity"] = base_error * conditions.get("noise_level", 0.02) * 15
 
     difficulty = conditions.get("difficulty", 1.0)
 
     if pde_type == "navier_stokes":
-        metrics["divergence_violation"] = base_error * 0.8 * difficulty
-        metrics["long_term_dissipation"] = max(0.0, 1.0 - base_error * 4 * difficulty)
+        metrics["divergence_violation"] = base_error * 1.2 * difficulty
+        metrics["long_term_dissipation"] = max(0.0, 1.0 - base_error * 5 * difficulty)
     elif pde_type == "burgers":
-        metrics["shock_capturing_quality"] = max(0.0, 1.0 - base_error * 6)
-        metrics["viscosity_robustness"] = max(0.0, 1.0 - base_error * 3.5 * difficulty)
+        metrics["shock_capturing_quality"] = max(0.0, 1.0 - base_error * 7)
+        metrics["viscosity_robustness"] = max(0.0, 1.0 - base_error * 4.5 * difficulty)
     elif pde_type == "darcy":
-        metrics["heterogeneous_robustness"] = max(0.0, 1.0 - base_error * 2.5)
+        metrics["heterogeneous_robustness"] = max(0.0, 1.0 - base_error * 3)
     elif pde_type == "heat":
-        metrics["diffusion_robustness"] = max(0.0, 1.0 - base_error * 3)
+        metrics["diffusion_robustness"] = max(0.0, 1.0 - base_error * 3.5)
 
+    # UQ Calibration
     if results is not None:
         uncertainty = results.get("uncertainty", results.get("std", results.get("ensemble_std", None)))
         if uncertainty is not None and isinstance(uncertainty, torch.Tensor):
@@ -142,8 +161,6 @@ def compute_stress_metrics(
                     corr = np.corrcoef(err_flat, unc_flat)[0, 1]
                     metrics["uq_error_correlation"] = float(corr)
                     metrics["uq_calibration_score"] = max(0.0, min(1.0, (corr + 1) / 2))
-                else:
-                    metrics["uq_calibration_score"] = 0.5
 
     return metrics
 
@@ -175,7 +192,7 @@ def run_stress_test(
     base_error = stress_metrics.get("stress_l2_error", 0.6)
     uq_calib = stress_metrics.get("uq_calibration_score", 0.5)
 
-    final_stress_score = max(0.0, 1.0 - base_error * 2.6 + (uq_calib - 0.5) * 0.3)
+    final_stress_score = max(0.0, 1.0 - base_error * 2.8 + (uq_calib - 0.5) * 0.35)
 
     return {
         "hard_pass": True,
@@ -192,23 +209,10 @@ def run_weak_local_stress_test(
     u_pred: torch.Tensor,
     u_true: torch.Tensor,
     pde_type: str,
-    difficulty: float = 0.6,
+    difficulty: float = 0.55,
 ) -> Dict[str, Any]:
-    """
-    Weak local stress test for miners.
+    conditions = generate_stress_conditions(challenge_id, difficulty=difficulty, salt="weak_local_stress")
 
-    - Uses fixed/public generation (not hidden)
-    - Lower difficulty
-    - Softer gates
-    - Mainly for guidance, not for perfect optimization
-    - Still encourages robustness without revealing validator secrets
-    """
-    # Use a fixed, known seed so it's reproducible but not adversarial
-    conditions = generate_stress_conditions(
-        challenge_id, difficulty=difficulty, salt="weak_local_stress"
-    )
-
-    # Run lighter version of hard gates
     hard_pass, gate_details = run_hard_gates(results, pde_type, conditions)
 
     if not hard_pass:
@@ -223,7 +227,7 @@ def run_weak_local_stress_test(
     stress_metrics = compute_stress_metrics(u_pred, u_true, conditions, pde_type, results=results)
 
     base_error = stress_metrics.get("stress_l2_error", 0.6)
-    local_stress_score = max(0.0, 1.0 - base_error * 2.2)
+    local_stress_score = max(0.0, 1.0 - base_error * 2.4)
 
     return {
         "hard_pass": True,
