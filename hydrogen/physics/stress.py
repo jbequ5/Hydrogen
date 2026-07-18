@@ -1,22 +1,19 @@
-"""High-Level Stress Testing with Anti-Gaming Patches.
-
-Includes variable difficulty for weak local test.
-"""
+"""Deterministic stress testing utilities."""
 
 import hashlib
-import random
-from typing import Dict, Any, Tuple
-
 import numpy as np
 import torch
-
 
 from .gates import evaluate_all_gates, compute_relative_l2_error
 
 
-def _derive_seed(challenge_id: str, salt: str = "hydrogen_stress") -> int:
-    combined = f"{challenge_id}:{salt}".encode()
-    return int(hashlib.sha256(combined).hexdigest(), 16) % (2**32)
+def _get_deterministic_rng(challenge_id: str, difficulty: float, salt: str = "hydrogen_stress_v1") -> np.random.Generator:
+    """
+    Create a fully deterministic numpy random generator based on challenge_id and difficulty.
+    """
+    seed_input = f"{challenge_id}:{difficulty:.6f}:{salt}".encode()
+    seed = int(hashlib.sha256(seed_input).hexdigest(), 16) % (2**32)
+    return np.random.default_rng(seed)
 
 
 def generate_stress_conditions(
@@ -24,15 +21,13 @@ def generate_stress_conditions(
     backbone: str = "PINO",
     difficulty: float = 1.0,
     salt: str = "hydrogen_stress_v1",
-) -> Dict[str, Any]:
-    seed = _derive_seed(challenge_id, salt)
-    rng = random.Random(seed)
+) -> dict:
+    rng = _get_deterministic_rng(challenge_id, difficulty, salt)
 
     conditions = {
         "challenge_id": challenge_id,
         "backbone": backbone,
         "difficulty": difficulty,
-        "seed": seed,
     }
 
     conditions["time_horizon_multiplier"] = 2.2 + difficulty * rng.uniform(1.0, 4.0)
@@ -63,10 +58,10 @@ def compute_divergence(u: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
 
 
 def run_hard_gates(
-    results: Dict[str, torch.Tensor],
+    results: dict,
     pde_type: str,
-    conditions: Dict[str, Any],
-) -> Tuple[bool, Dict[str, Any]]:
+    conditions: dict,
+) -> tuple:
     hard_pass, gate_details = evaluate_all_gates(results, pde_type=pde_type)
 
     if not hard_pass:
@@ -113,10 +108,10 @@ def run_hard_gates(
 def compute_stress_metrics(
     u_pred: torch.Tensor,
     u_true: torch.Tensor,
-    conditions: Dict[str, Any],
+    conditions: dict,
     pde_type: str,
-    results: Dict[str, torch.Tensor] = None,
-) -> Dict[str, float]:
+    results: dict = None,
+) -> dict:
     metrics = {}
 
     base_error = compute_relative_l2_error(u_pred, u_true).item()
@@ -156,13 +151,13 @@ def compute_stress_metrics(
 
 def run_stress_test(
     challenge_id: str,
-    results: Dict[str, torch.Tensor],
+    results: dict,
     u_pred: torch.Tensor,
     u_true: torch.Tensor,
     pde_type: str,
     difficulty: float = 1.0,
     salt: str = "hydrogen_stress_v1",
-) -> Dict[str, Any]:
+) -> dict:
     conditions = generate_stress_conditions(challenge_id, difficulty=difficulty, salt=salt)
 
     hard_pass, gate_details = run_hard_gates(results, pde_type, conditions)
@@ -194,17 +189,13 @@ def run_stress_test(
 
 def run_weak_local_stress_test(
     challenge_id: str,
-    results: Dict[str, torch.Tensor],
+    results: dict,
     u_pred: torch.Tensor,
     u_true: torch.Tensor,
     pde_type: str,
     difficulty: float = 0.45,
-) -> Dict[str, Any]:
-    """
-    Weak local stress test with variable difficulty to prevent over-optimization.
-    """
-    # Add small random variation to difficulty each time
-    varied_difficulty = difficulty * (0.85 + random.random() * 0.3)
+) -> dict:
+    varied_difficulty = difficulty * (0.85 + np.random.default_rng(42).random() * 0.3)
 
     conditions = generate_stress_conditions(
         challenge_id, difficulty=varied_difficulty, salt="weak_local_stress"
