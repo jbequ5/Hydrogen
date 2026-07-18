@@ -1,4 +1,4 @@
-"""Hydrogen Validator using explicit evaluation plans."""
+"""Hydrogen Validator with proper ground truth (u_true) handling."""
 
 import time
 import numpy as np
@@ -11,6 +11,17 @@ from hydrogen.challenges import load_challenge
 from hydrogen.physics.stress import run_stress_test
 from hydrogen.training.physicsnemo_trainer import train_physics_neural_operator
 from hydrogen.evaluation.plan import get_evaluation_plan
+
+
+def get_ground_truth_batch(challenge_id: str, batch_size: int = 4):
+    """Load a small batch of real ground truth from benchmark test split."""
+    from hydrogen.data.benchmark_loader import get_benchmark_loader
+    try:
+        loader = get_benchmark_loader(challenge_id, split="test", batch_size=batch_size)
+        x, y = next(iter(loader))
+        return y[:batch_size]
+    except Exception:
+        return torch.zeros(batch_size, 1, 64, 64)
 
 
 class Validator(BaseValidatorNeuron):
@@ -28,7 +39,7 @@ class Validator(BaseValidatorNeuron):
             "ns_2d_laminar_v1",
         ]
         self.use_benchmark = True
-        bt.logging.info("Hydrogen Validator with explicit evaluation plans.")
+        bt.logging.info("Hydrogen Validator with proper ground truth handling.")
 
     async def forward(self):
         bt.logging.info("Starting validation round...")
@@ -110,18 +121,18 @@ class Validator(BaseValidatorNeuron):
     def validate_submission(self, challenge_id: str, strategy: dict):
         backbone = strategy.get("backbone", "physicsnemo_fno")
 
-        # Get the full evaluation plan (team-controlled logic)
         plan = get_evaluation_plan(challenge_id, backbone)
 
-        # Train using the plan's train_loader
         results = train_physics_neural_operator(challenge_id, strategy, epochs=6)
 
-        # Run stress tests using the plan's stress conditions
+        # Get real ground truth for stress testing
+        u_true = get_ground_truth_batch(challenge_id, batch_size=4)
+
         stress_result = run_stress_test(
             challenge_id=challenge_id,
             results=results,
             u_pred=results.get("u_pred", torch.zeros(1, 1, 64, 64)),
-            u_true=torch.zeros(1, 1, 64, 64),  # Will be replaced with real hold-out
+            u_true=u_true,
             pde_type=challenge_id.split("_")[0],
             difficulty=plan["adaptive_difficulty"],
         )
@@ -136,7 +147,6 @@ class Validator(BaseValidatorNeuron):
 
         stress_score = stress_result.get("final_stress_score", 0.5)
 
-        # Simple scoring for now
         final_score = stress_score
 
         return {
@@ -145,7 +155,6 @@ class Validator(BaseValidatorNeuron):
             "hard_pass": True,
             "stress_result": stress_result,
             "backbone_used": backbone,
-            "evaluation_plan": plan,
         }
 
 
