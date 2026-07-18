@@ -1,6 +1,8 @@
-"""HydrogenScorer (Completed Version)
+"""HydrogenScorer with Multi-Objective Scoring
 
-Fully integrates training, stress testing, physics gates, and benchmark scoring.
+Computes multiple fine-grained metrics internally.
+Collapses them into high-level objectives for scoring.
+Exports rich data for the Landscape Agent.
 """
 
 from typing import Dict, Any
@@ -17,6 +19,10 @@ class HydrogenScorer:
     def __init__(self, config: bt.config):
         self.config = config
 
+        # Configurable high-level objective weights
+        self.stress_weight = getattr(config, "stress_weight", 0.75)
+        self.benchmark_weight = getattr(config, "benchmark_weight", 0.25)
+
     def score_strategy(self, uid: int, hotkey: str, strategy: dict) -> float:
         challenge_id = strategy.get("challenge_id") or self._get_default_challenge(uid)
         backbone = strategy.get("backbone", "physicsnemo_fno")
@@ -25,7 +31,27 @@ class HydrogenScorer:
 
         try:
             eval_result = self._evaluate(strategy, plan, backbone)
-            return eval_result.get("final_score", 0.0)
+
+            # Use high-level objectives for final score
+            high_level = eval_result["high_level_objectives"]
+            final_score = (
+                self.stress_weight * high_level["stress_physics"] +
+                self.benchmark_weight * high_level["benchmark_accuracy"]
+            )
+
+            # Attach rich data for Landscape Agent
+            eval_result["landscape_data"] = {
+                "uid": uid,
+                "hotkey": hotkey,
+                "challenge_id": challenge_id,
+                "backbone": backbone,
+                "fine_grained_scores": eval_result["fine_grained_scores"],
+                "high_level_objectives": high_level,
+                "strategy": strategy,
+            }
+
+            return final_score
+
         except Exception as e:
             bt.logging.error(f"Scoring failed for uid {uid}: {e}")
             return 0.0
@@ -33,7 +59,7 @@ class HydrogenScorer:
     def _evaluate(self, strategy: dict, plan: dict, backbone: str) -> Dict[str, Any]:
         model = get_model(backbone=backbone)
 
-        # 1. Training
+        # === Training ===
         train_result = train_model(
             model=model,
             train_loader=plan.get("train_loader"),
@@ -41,7 +67,7 @@ class HydrogenScorer:
             epochs=strategy.get("epochs", 50),
         )
 
-        # 2. Stress Testing + Physics Gates (primary signal)
+        # === Stress + Physics ===
         stress_result = run_stress_test(
             challenge_id=plan.get("challenge_id", "unknown"),
             results=train_result,
@@ -50,38 +76,46 @@ class HydrogenScorer:
             pde_type=plan.get("pde_type", "generic"),
         )
 
-        # 3. Benchmark scoring (secondary signal from hold-out data)
+        stress_physics_score = stress_result.get("final_stress_score", 0.0)
+
+        # === Benchmark Accuracy ===
         benchmark_score = self._compute_benchmark_score(train_result, plan)
 
-        # Combine scores (stress is primary, benchmark provides supporting signal)
-        stress_score = stress_result.get("final_stress_score", 0.0)
-        final_score = 0.7 * stress_score + 0.3 * benchmark_score
+        # === Fine-grained scores (for Landscape) ===
+        fine_grained = {
+            "benchmark_mse": self._safe_get(train_result, "benchmark_mse", 0.0),
+            "physics_residual": stress_result.get("physics_residual", 0.0),
+            "long_term_stability": stress_result.get("long_term_stability", 0.0),
+            "stress_generalization": stress_result.get("stress_generalization", 0.0),
+        }
+
+        # === High-level objectives (for scoring / Pareto) ===
+        high_level = {
+            "stress_physics": stress_physics_score,
+            "benchmark_accuracy": benchmark_score,
+            # Future: add "efficiency", "uncertainty_quality", etc.
+        }
 
         return {
-            "final_score": final_score,
+            "final_score": 0.0,  # Will be overwritten in score_strategy
+            "fine_grained_scores": fine_grained,
+            "high_level_objectives": high_level,
             "stress_result": stress_result,
-            "benchmark_score": benchmark_score,
             "train_result": train_result,
         }
 
     def _compute_benchmark_score(self, train_result: dict, plan: dict) -> float:
-        """
-        Simple benchmark scoring using hold-out / test data from the evaluation plan.
-        Can be expanded later with more sophisticated metrics.
-        """
         try:
             benchmark_loader = plan.get("benchmark_loader")
             if not benchmark_loader:
-                return 0.5  # neutral fallback
+                return 0.5
 
-            # Run inference on benchmark test set
             model = train_result.get("model")
             if model is None:
                 return 0.0
 
             total_error = 0.0
             count = 0
-
             for batch in benchmark_loader:
                 x, y = batch[0], batch[1]
                 with bt.no_grad():
@@ -91,12 +125,13 @@ class HydrogenScorer:
                     count += 1
 
             avg_error = total_error / max(count, 1)
-            # Convert error to score (lower error = higher score)
-            benchmark_score = max(0.0, 1.0 - avg_error * 5)
-            return min(1.0, benchmark_score)
+            return max(0.0, 1.0 - avg_error * 5)
 
         except Exception:
             return 0.5
+
+    def _safe_get(self, d: dict, key: str, default=0.0):
+        return d.get(key, default) if isinstance(d, dict) else default
 
     def _get_default_challenge(self, uid: int) -> str:
         challenges = getattr(self.config, "active_challenges", ["poisson_2d_v1"])
