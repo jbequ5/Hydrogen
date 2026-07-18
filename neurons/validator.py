@@ -1,6 +1,6 @@
-"""Hydrogen Validator with anti-gaming IM patches.
+"""Hydrogen Validator with full anti-gaming patches.
 
-Includes novelty bonus and stricter Top-2 stipend rules.
+Includes UQ as soft gate + all previous IM improvements.
 """
 
 import time
@@ -34,7 +34,7 @@ class Validator(BaseValidatorNeuron):
             "ns_2d_laminar_v1",
         ]
         self.use_benchmark = True
-        bt.logging.info("Hydrogen Validator with anti-gaming patches active.")
+        bt.logging.info("Hydrogen Validator with complete anti-gaming IM.")
 
     async def forward(self):
         bt.logging.info("Starting validation round...")
@@ -193,11 +193,17 @@ class Validator(BaseValidatorNeuron):
             }
 
         stress_score = stress_result.get("final_stress_score", 0.5)
+        stress_metrics = stress_result.get("stress_metrics", {})
+        uq_calib = stress_metrics.get("uq_calibration_score", 0.5)
 
-        # NEW: Novelty / Improvement Bonus (anti prior-farming)
+        # NEW: UQ Calibration as Soft Gate
+        uq_penalty = 0.0
+        if uq_calib < 0.55:
+            uq_penalty = (0.55 - uq_calib) * 0.4   # Penalty up to ~0.18
+
+        # Novelty bonus (already added)
         novelty_bonus = 0.0
         try:
-            from hydrogen.emission.mechanics import get_or_create_state
             state = get_or_create_state(challenge_id)
             if state.previous_best_score > 0:
                 relative_improvement = (stress_score - state.previous_best_score) / (state.previous_best_score + 1e-8)
@@ -209,7 +215,7 @@ class Validator(BaseValidatorNeuron):
         stress_weight = min(0.65, max(0.35, stress_weight))
         public_weight = 1.0 - stress_weight
 
-        final_score = (public_improvement * public_weight) + (stress_score * stress_weight) + novelty_bonus
+        final_score = (public_improvement * public_weight) + (stress_score * stress_weight) + novelty_bonus - uq_penalty
 
         return {
             "score": max(0.0, final_score),

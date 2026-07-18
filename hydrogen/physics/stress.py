@@ -1,6 +1,6 @@
-"""Very High-Level Stress Testing Engine (Anti-Gaming Focused).
+"""High-Level Stress Testing with Anti-Gaming Patches.
 
-Comprehensive upgrades while remaining practical for validators.
+Includes variable difficulty for weak local test.
 """
 
 import hashlib
@@ -74,7 +74,6 @@ def run_hard_gates(
 
     difficulty = conditions.get("difficulty", 1.0)
 
-    # Navier-Stokes
     if pde_type == "navier_stokes":
         if "velocity" in results:
             vel = results["velocity"]
@@ -92,7 +91,6 @@ def run_hard_gates(
                     gate_details["ns_long_term_stability"] = False
                     return False, gate_details
 
-    # Burgers
     if pde_type == "burgers":
         if "energy_trajectory" in results:
             energy = results["energy_trajectory"]
@@ -101,7 +99,6 @@ def run_hard_gates(
                     gate_details["burgers_negative_energy"] = False
                     return False, gate_details
 
-    # General long-horizon stability
     if "energy_trajectory" in results:
         energy = results["energy_trajectory"]
         if len(energy) > 16:
@@ -203,7 +200,15 @@ def run_weak_local_stress_test(
     pde_type: str,
     difficulty: float = 0.45,
 ) -> Dict[str, Any]:
-    conditions = generate_stress_conditions(challenge_id, difficulty=difficulty, salt="weak_local_stress")
+    """
+    Weak local stress test with variable difficulty to prevent over-optimization.
+    """
+    # Add small random variation to difficulty each time
+    varied_difficulty = difficulty * (0.85 + random.random() * 0.3)
+
+    conditions = generate_stress_conditions(
+        challenge_id, difficulty=varied_difficulty, salt="weak_local_stress"
+    )
 
     hard_pass, gate_details = run_hard_gates(results, pde_type, conditions)
 
