@@ -1,7 +1,6 @@
-"""MCP-style Server with persistent sessions + basic streaming support.
+"""MCP-style Server with persistent sessions, streaming, and retry logic.
 
-Streaming is useful for long-running operations (e.g., training or
-multi-iteration validation).
+Includes retry directive in SSE streams for better client reconnection behavior.
 """
 
 import os
@@ -9,6 +8,7 @@ import json
 import time
 import uuid
 
+import asyncio
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import StreamingResponse
 
@@ -18,8 +18,8 @@ from hydrogen.miner.client import MockHydrogenClient
 
 app = FastAPI(
     title="Hydrogen Mining MCP Server",
-    description="MCP-style server with persistent sessions and streaming.",
-    version="0.6.0",
+    description="MCP-style server with persistent sessions and resilient streaming.",
+    version="0.7.0",
 )
 
 # ============================================================
@@ -186,27 +186,33 @@ async def submit_strategy(payload: dict, auth: bool = Depends(verify_api_key)):
 
 
 # ============================================================
-# Streaming Example (for long-running operations)
+# Streaming with Retry Logic
 # ============================================================
 
 @app.post("/tools/stream_validation")
 async def stream_validation(payload: dict, auth: bool = Depends(verify_api_key)):
     """
-    Example streaming endpoint for long-running validation.
-    In a real system, this could stream progress of training or multi-iteration validation.
+    Streaming validation with retry directive.
+    Clients can use the 'retry' field to automatically reconnect on disconnect.
     """
     strategy = payload.get("strategy")
     challenge_id = payload.get("challenge_id")
     session_id = payload.get("session_id")
 
+    RETRY_MS = 3000  # Retry every 3 seconds if connection drops
+
     async def event_generator():
+        # Send retry directive first
+        yield f"retry: {RETRY_MS}\n\n"
+
         for i in range(1, 6):
             progress = i * 20
             yield f"data: {{\"progress\": {progress}, \"message\": \"Validating iteration {i}\"}}\n\n"
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.6)
 
         # Final result
         result = await miner.validate_locally(strategy, challenge_id)
+
         if session_id:
             sid, data = get_or_create_session(session_id)
             data["history"].append({"action": "stream_validate", "result": result})
