@@ -1,68 +1,41 @@
-"""Improved MCP-compatible Server for Hydrogen Mining Tools.
+"""Improved MCP-style Server for Hydrogen.
 
-Features:
-- Proper error handling
-- Request validation
-- Optional API key authentication
-- Health check
-- Clean structured responses
+This version is more structured and closer to a native MCP server pattern.
+It uses FastAPI but is designed to be easy to migrate to a full MCP runtime later.
 """
 
 import os
 
 from fastapi import FastAPI, HTTPException, Depends, Header
-from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from hydrogen.miner.agent import AgenticMiner
-from hydrogen.miner.agent_tools import (
-    HydrogenMiningTools,
-    ListChallengesOutput,
-    GetPriorsInput,
-    GetPriorsOutput,
-    ProposeStrategyInput,
-    ProposeStrategyOutput,
-    ValidateStrategyInput,
-    ValidateStrategyOutput,
-    SubmitStrategyInput,
-    SubmitStrategyOutput,
-    GetRecentResultsInput,
-    GetRecentResultsOutput,
-)
+from hydrogen.miner.client import MockHydrogenClient
 
 
 app = FastAPI(
-    title="Hydrogen Mining Tools (MCP-style)",
-    description="Structured tools for autonomous/agentic mining in Hydrogen.",
-    version="0.2.0",
+    title="Hydrogen Mining MCP Server",
+    description="Structured tools for agentic mining in Hydrogen.",
+    version="0.3.0",
 )
 
 # ============================================================
-# Configuration
+# Client & Miner Initialization
 # ============================================================
 
-API_KEY = os.getenv("HYDROGEN_API_KEY")  # Optional API key
+client = MockHydrogenClient()
+miner = AgenticMiner(client)
+
+
+def get_miner() -> AgenticMiner:
+    return miner
 
 
 def verify_api_key(x_api_key: str = Header(None)):
-    if API_KEY and x_api_key != API_KEY:
+    api_key = os.getenv("HYDROGEN_API_KEY")
+    if api_key and x_api_key != api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
     return True
-
-
-def get_tools() -> HydrogenMiningTools:
-    if tools is None:
-        raise HTTPException(status_code=503, detail="Tools not initialized")
-    return tools
-
-
-miner = None
-tools = None
-
-
-def init_tools(miner_instance: AgenticMiner):
-    global miner, tools
-    miner = miner_instance
-    tools = HydrogenMiningTools(miner)
 
 
 # ============================================================
@@ -70,70 +43,53 @@ def init_tools(miner_instance: AgenticMiner):
 # ============================================================
 
 @app.get("/health")
-async def health_check():
-    return {"status": "ok", "service": "Hydrogen Mining Tools"}
+async def health():
+    return {"status": "ok"}
 
 
 # ============================================================
-# Tools
+# Tool Endpoints (MCP-style)
 # ============================================================
 
-@app.get("/tools/list_challenges", response_model=ListChallengesOutput)
+@app.get("/tools/list_challenges")
 async def list_challenges(auth: bool = Depends(verify_api_key)):
-    try:
-        return await tools.list_challenges()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return await miner.get_challenges()
 
 
-@app.post("/tools/get_priors", response_model=GetPriorsOutput)
-async def get_priors(
-    input_data: GetPriorsInput, auth: bool = Depends(verify_api_key)
-):
-    try:
-        return await tools.get_priors(**input_data.dict())
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@app.post("/tools/get_priors")
+async def get_priors(payload: dict, auth: bool = Depends(verify_api_key)):
+    challenge_id = payload.get("challenge_id")
+    if not challenge_id:
+        raise HTTPException(status_code=400, detail="challenge_id is required")
+    return await miner.get_priors(challenge_id)
 
 
-@app.post("/tools/propose_strategy", response_model=ProposeStrategyOutput)
-async def propose_strategy(
-    input_data: ProposeStrategyInput, auth: bool = Depends(verify_api_key)
-):
-    try:
-        return await tools.propose_strategy(**input_data.dict())
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@app.post("/tools/propose_strategy")
+async def propose_strategy(payload: dict, auth: bool = Depends(verify_api_key)):
+    challenge_id = payload.get("challenge_id")
+    base = payload.get("base_strategy")
+    return await miner.propose_strategy(challenge_id, base_strategy=base)
 
 
-@app.post("/tools/validate_strategy", response_model=ValidateStrategyOutput)
-async def validate_strategy(
-    input_data: ValidateStrategyInput, auth: bool = Depends(verify_api_key)
-):
-    try:
-        return await tools.validate_strategy(**input_data.dict())
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@app.post("/tools/validate_strategy")
+async def validate_strategy(payload: dict, auth: bool = Depends(verify_api_key)):
+    strategy = payload.get("strategy")
+    challenge_id = payload.get("challenge_id")
+    quick = payload.get("quick", True)
+    return await miner.validate_locally(strategy, challenge_id, quick=quick)
 
 
-@app.post("/tools/submit_strategy", response_model=SubmitStrategyOutput)
-async def submit_strategy(
-    input_data: SubmitStrategyInput, auth: bool = Depends(verify_api_key)
-):
-    try:
-        return await tools.submit_strategy(**input_data.dict())
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@app.post("/tools/submit_strategy")
+async def submit_strategy(payload: dict, auth: bool = Depends(verify_api_key)):
+    strategy = payload.get("strategy")
+    challenge_id = payload.get("challenge_id")
+    return await miner.submit(strategy, challenge_id)
 
 
-@app.post("/tools/get_my_recent_results", response_model=GetRecentResultsOutput)
-async def get_my_recent_results(
-    input_data: GetRecentResultsInput, auth: bool = Depends(verify_api_key)
-):
-    try:
-        return await tools.get_my_recent_results(**input_data.dict())
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@app.post("/tools/get_recent_results")
+async def get_recent_results(payload: dict, auth: bool = Depends(verify_api_key)):
+    limit = payload.get("limit", 10)
+    return await miner.get_recent_performance(limit=limit)
 
 
 if __name__ == "__main__":
