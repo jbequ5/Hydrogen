@@ -1,6 +1,7 @@
-"""MCP-style Server with Redis-backed sessions (with file fallback).
+"""MCP-style Server with optimized Redis connection pooling.
 
-Sessions are now stored in Redis when available, with file-based fallback.
+Uses a properly configured async Redis connection pool for better performance
+and resource usage.
 """
 
 import os
@@ -11,8 +12,10 @@ import uuid
 import asyncio
 try:
     import redis.asyncio as aioredis
+    from redis.asyncio.connection import ConnectionPool
 except ImportError:
     aioredis = None
+    ConnectionPool = None
 
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import StreamingResponse
@@ -23,12 +26,12 @@ from hydrogen.miner.client import MockHydrogenClient
 
 app = FastAPI(
     title="Hydrogen Mining MCP Server",
-    description="MCP-style server with Redis-backed persistent sessions.",
-    version="0.9.0",
+    description="MCP-style server with optimized Redis sessions.",
+    version="1.0.0",
 )
 
 # ============================================================
-# Redis / File Session Backend
+# Redis Connection Pool (Optimized)
 # ============================================================
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -36,12 +39,21 @@ SESSION_TTL_SECONDS = 86400  # 24 hours
 
 redis_client = None
 
-if aioredis:
+if aioredis and ConnectionPool:
     try:
-        redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
+        pool = ConnectionPool.from_url(
+            REDIS_URL,
+            decode_responses=True,
+            max_connections=50,           # Reasonable pool size
+            socket_connect_timeout=5,
+            socket_keepalive=True,
+            health_check_interval=30,     # Keep connections healthy
+        )
+        redis_client = aioredis.Redis(connection_pool=pool)
     except Exception:
         redis_client = None
 
+# File fallback
 SESSION_DIR = "./sessions"
 if not redis_client:
     os.makedirs(SESSION_DIR, exist_ok=True)
