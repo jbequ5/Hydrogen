@@ -1,7 +1,4 @@
-"""Highly modular unified trainer.
-
-Respects as many strategy fields as possible.
-"""
+"""Highly modular trainer supporting many strategy-controlled options."""
 
 from typing import Dict, Any, Optional
 
@@ -22,7 +19,6 @@ def get_model(
 
 
 def get_optimizer(model: nn.Module, strategy: dict):
-    """Create optimizer from strategy config."""
     opt_name = strategy.get("optimizer", "AdamW").lower()
     lr = strategy.get("learning_rate", 0.001)
     weight_decay = strategy.get("weight_decay", 1e-4)
@@ -35,12 +31,10 @@ def get_optimizer(model: nn.Module, strategy: dict):
         momentum = strategy.get("momentum", 0.9)
         return torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
     else:
-        # Default fallback
         return torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
 
 def get_scheduler(optimizer, strategy: dict, epochs: int):
-    """Create learning rate scheduler from strategy."""
     scheduler_name = strategy.get("scheduler", "CosineAnnealingLR").lower()
 
     if scheduler_name == "cosineannealinglr":
@@ -71,24 +65,59 @@ def train_model(
     optimizer = get_optimizer(model, strategy)
     scheduler = get_scheduler(optimizer, strategy, epochs)
 
+    # Gradient clipping
+    grad_clip_norm = strategy.get("grad_clip_norm", None)
+
+    # Gradient accumulation
+    accumulation_steps = strategy.get("accumulation_steps", 1)
+
+    # Mixed precision
+    use_amp = strategy.get("use_amp", False) and device.startswith("cuda")
+    scaler = torch.cuda.amp.GradScaler() if use_amp else None
+
+    # Early stopping (basic)
+    early_stop_patience = strategy.get("early_stop_patience", None)
+    best_val_loss = float("inf")
+    epochs_no_improve = 0
+
     history = {"train_loss": [], "val_loss": []}
 
     for epoch in range(epochs):
         model.train()
         total_loss = 0.0
+        optimizer.zero_grad()
 
-        for batch in train_loader:
+        for i, batch in enumerate(train_loader):
             x, y = batch[0].to(device), batch[1].to(device)
-            pred = model(x)
 
-            loss = torch.nn.functional.mse_loss(pred, y)
+            if use_amp:
+                with torch.cuda.amp.autocast():
+                    pred = model(x)
+                    loss = torch.nn.functional.mse_loss(pred, y)
+                    if physics_loss_fn is not None:
+                        loss = loss + physics_loss_fn(pred, x)
+                scaler.scale(loss).backward()
+            else:
+                pred = model(x)
+                loss = torch.nn.functional.mse_loss(pred, y)
+                if physics_loss_fn is not None:
+                    loss = loss + physics_loss_fn(pred, x)
+                loss.backward()
 
-            if physics_loss_fn is not None:
-                loss = loss + physics_loss_fn(pred, x)
+            # Gradient accumulation
+            if (i + 1) % accumulation_steps == 0:
+                if grad_clip_norm:
+                    if use_amp:
+                        scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip_norm)
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+                if use_amp:
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    optimizer.step()
+
+                optimizer.zero_grad()
 
             total_loss += loss.item()
 
@@ -96,6 +125,7 @@ def train_model(
         history["train_loss"].append(avg_train)
 
         # Validation
+        current_val_loss = None
         if val_loader is not None:
             model.eval()
             val_loss = 0.0
@@ -104,19 +134,31 @@ def train_model(
                     x, y = batch[0].to(device), batch[1].to(device)
                     pred = model(x)
                     val_loss += torch.nn.functional.mse_loss(pred, y).item()
-            avg_val = val_loss / len(val_loader)
-            history["val_loss"].append(avg_val)
+            current_val_loss = val_loss / len(val_loader)
+            history["val_loss"].append(current_val_loss)
 
             if (epoch + 1) % 10 == 0:
-                print(f"Epoch {epoch+1}/{epochs} - Train: {avg_train:.6f} | Val: {avg_val:.6f}")
+                print(f"Epoch {epoch+1}/{epochs} - Train: {avg_train:.6f} | Val: {current_val_loss:.6f}")
         else:
             if (epoch + 1) % 10 == 0:
                 print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_train:.6f}")
 
-        # Step scheduler
-        if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-            scheduler.step(avg_train)
+        # Scheduler step
+        if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau) and current_val_loss is not None:
+            scheduler.step(current_val_loss)
         else:
             scheduler.step()
+
+        # Early stopping
+        if early_stop_patience and current_val_loss is not None:
+            if current_val_loss < best_val_loss - 1e-6:
+                best_val_loss = current_val_loss
+                epochs_no_improve = 0
+            else:
+                epochs_no_improve += 1
+
+            if epochs_no_improve >= early_stop_patience:
+                print(f"Early stopping triggered at epoch {epoch+1}")
+                break
 
     return {"model": model, "history": history}
