@@ -1,6 +1,6 @@
-"""Hydrogen Validator with robust 75/25 emission weight logic.
+"""Hydrogen Validator with anti-gaming IM patches.
 
-Includes better edge-case handling and clear logging for Top-2 stipend.
+Includes novelty bonus and stricter Top-2 stipend rules.
 """
 
 import time
@@ -34,7 +34,7 @@ class Validator(BaseValidatorNeuron):
             "ns_2d_laminar_v1",
         ]
         self.use_benchmark = True
-        bt.logging.info("Hydrogen Validator with robust Top-2 stipend logic.")
+        bt.logging.info("Hydrogen Validator with anti-gaming patches active.")
 
     async def forward(self):
         bt.logging.info("Starting validation round...")
@@ -100,39 +100,18 @@ class Validator(BaseValidatorNeuron):
                     self.scores[hotkey] *= 1.15
 
     def _set_weights(self):
-        """
-        Applies the decaying Top-2 stipend on-chain with good robustness and logging.
-        """
         try:
             weight_dict = {}
 
-            bt.logging.info("=== Top-2 Stipend Weight Calculation ===")
-
             for challenge_id in self.challenge_ids:
-                state = get_or_create_state(challenge_id)
-
-                # Log current leaders for visibility
-                leader = state.leader_hotkey[:8] if state.leader_hotkey else "None"
-                second = state.second_hotkey[:8] if state.second_hotkey else "None"
-                bt.logging.info(
-                    f"{challenge_id}: #1={leader}, #2={second}, "
-                    f"best_score={state.current_best_score:.4f}, "
-                    f"epochs_no_improve={state.epochs_without_improvement}"
-                )
-
-                challenge_weights = get_yuma_weights(
-                    challenge_id=challenge_id,
-                    total_stipend_pool=1.0,
-                )
+                challenge_weights = get_yuma_weights(challenge_id=challenge_id)
 
                 for hotkey, w in challenge_weights.items():
                     weight_dict[hotkey] = weight_dict.get(hotkey, 0.0) + w
 
             if not weight_dict:
-                bt.logging.warning("No Top-2 leaders found. Skipping weight set.")
                 return
 
-            # Build uids and weights
             hotkeys = []
             weights_list = []
             for hotkey, w in weight_dict.items():
@@ -142,26 +121,17 @@ class Validator(BaseValidatorNeuron):
                     weights_list.append(float(w))
 
             if not hotkeys:
-                bt.logging.warning("No valid hotkeys in Top-2. Skipping weight set.")
                 return
 
             weights = np.array(weights_list, dtype=np.float32)
+            total = weights.sum()
+            if total > 1e-8:
+                weights = weights / total
 
-            # Normalize
-            total_weight = weights.sum()
-            if total_weight > 1e-8:
-                weights = weights / total_weight
-            else:
-                bt.logging.warning("Total weight too small. Skipping weight set.")
-                return
-
-            # Final safety cap
             weights = np.clip(weights, 0.001, 1.0)
             weights = weights / weights.sum()
 
-            bt.logging.info(f"Setting weights for {len(hotkeys)} miners (Top-2 stipend).")
-
-            result = self.subtensor.set_weights(
+            self.subtensor.set_weights(
                 wallet=self.wallet,
                 netuid=self.config.netuid,
                 uids=hotkeys,
@@ -224,11 +194,22 @@ class Validator(BaseValidatorNeuron):
 
         stress_score = stress_result.get("final_stress_score", 0.5)
 
+        # NEW: Novelty / Improvement Bonus (anti prior-farming)
+        novelty_bonus = 0.0
+        try:
+            from hydrogen.emission.mechanics import get_or_create_state
+            state = get_or_create_state(challenge_id)
+            if state.previous_best_score > 0:
+                relative_improvement = (stress_score - state.previous_best_score) / (state.previous_best_score + 1e-8)
+                novelty_bonus = min(0.15, max(0.0, relative_improvement * 0.8))
+        except Exception:
+            pass
+
         stress_weight = 0.35 + min(0.25, public_improvement * 0.8)
         stress_weight = min(0.65, max(0.35, stress_weight))
         public_weight = 1.0 - stress_weight
 
-        final_score = (public_improvement * public_weight) + (stress_score * stress_weight)
+        final_score = (public_improvement * public_weight) + (stress_score * stress_weight) + novelty_bonus
 
         return {
             "score": max(0.0, final_score),

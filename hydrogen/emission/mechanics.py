@@ -1,6 +1,8 @@
-"""Core emission mechanics for Hydrogen (75/25 model).
+"""Incentive Mechanism Patches - Anti-Gaming Improvements.
 
-Configurable Top-2 split and Yuma-friendly weight generation.
+Includes:
+- Minimum improvement requirement for Top-2 stipend
+- Novelty / Improvement bonus support
 """
 
 from typing import Dict, Any, Tuple
@@ -9,7 +11,7 @@ import numpy as np
 
 
 # ============================================================
-# Configuration (can be overridden)
+# Configuration
 # ============================================================
 
 BREAKTHROUGH_BOUNTY_SHARE = 0.75
@@ -19,14 +21,12 @@ BREAKTHROUGH_THRESHOLD = 0.06
 STIPEND_DECAY_RATE = 0.45
 BREAKTHROUGH_COOLDOWN_EPOCHS = 8
 
-# Default Top-2 split (can be changed)
 DEFAULT_LEADER_SHARE = 0.72
 DEFAULT_SECOND_SHARE = 0.28
 
+# NEW: Minimum improvement required to be eligible for Top-2 stipend
+MIN_IMPROVEMENT_FOR_STIPEND = 0.025  # 2.5%
 
-# ============================================================
-# Data Structures
-# ============================================================
 
 class ChallengeState:
     def __init__(self):
@@ -38,6 +38,7 @@ class ChallengeState:
         self.epochs_without_improvement = 0
         self.epochs_since_last_breakthrough = 0
         self.accumulated_bounty_pool = 0.0
+        self.previous_best_score = 0.0   # For improvement calculation
 
 
 CHALLENGE_STATES: Dict[str, ChallengeState] = {}
@@ -71,6 +72,7 @@ def update_leaderboard(
     message = "No change"
 
     state.epochs_since_last_breakthrough += 1
+    state.previous_best_score = state.current_best_score
 
     if is_breakthrough(new_score, state.current_best_score):
         if state.epochs_since_last_breakthrough >= BREAKTHROUGH_COOLDOWN_EPOCHS:
@@ -81,7 +83,7 @@ def update_leaderboard(
             state.epochs_since_last_breakthrough = 0
             message = f"New record set by {hotkey[:8]}!"
         else:
-            message = f"Strong result, but cooldown active ({state.epochs_since_last_breakthrough}/{BREAKTHROUGH_COOLDOWN_EPOCHS})"
+            message = f"Strong result, but cooldown active"
     else:
         state.epochs_without_improvement += 1
 
@@ -98,12 +100,18 @@ def calculate_top2_stipend(
     leader_ratio: float = DEFAULT_LEADER_SHARE,
     second_ratio: float = DEFAULT_SECOND_SHARE,
 ) -> Dict[str, float]:
-    """
-    Calculate decaying Top-2 stipend with configurable split.
-    """
     state = get_or_create_state(challenge_id)
 
     if state.leader_hotkey is None:
+        return {}
+
+    # NEW: Check if current leader has shown recent improvement
+    improvement = 0.0
+    if state.previous_best_score > 0:
+        improvement = (state.current_best_score - state.previous_best_score) / (state.previous_best_score + 1e-8)
+
+    if improvement < MIN_IMPROVEMENT_FOR_STIPEND:
+        # Not enough improvement → reduce or remove stipend eligibility
         return {}
 
     decay_factor = (1 - STIPEND_DECAY_RATE) ** state.epochs_without_improvement
@@ -131,10 +139,6 @@ def get_yuma_weights(
     leader_ratio: float = DEFAULT_LEADER_SHARE,
     second_ratio: float = DEFAULT_SECOND_SHARE,
 ) -> Dict[str, float]:
-    """
-    Returns weights ready for Yuma Consensus / set_weights.
-    Normalized so they sum to total_stipend_pool.
-    """
     return calculate_top2_stipend(
         challenge_id=challenge_id,
         total_stipend_pool=total_stipend_pool,
