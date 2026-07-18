@@ -1,45 +1,50 @@
-# hydrogen/validator:pino-v0.2 (Improved Phase 0)
-# Pinned, reproducible, and more robust validator image
+# Multi-backend Validator Image for Hydrogen
+# Supports both PhysicsNeMo and NeuralOperator backbones
 
-FROM nvcr.io/nvidia/pytorch:24.09-py3 AS builder
-
-LABEL maintainer="Hydrogen contributors <jbequ5>"
-LABEL description="Hydrogen validator image with PhysicsNeMo (improved)"
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl ca-certificates julia=1.10.* \
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-dev \
+    git \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Julia packages (for symbolic metadata)
-RUN julia -e 'using Pkg; Pkg.add(["ModelingToolkit", "Symbolics", "DataDrivenDiffEq"]); Pkg.precompile()'
+# Upgrade pip
+RUN pip3 install --upgrade pip setuptools wheel
 
-# Install Python dependencies with pinned versions where possible
-RUN pip install --no-cache-dir \
-    "physicsnemo==1.0.0" \
-    "neuraloperator>=0.3.0" \
-    "bittensor>=6.0" \
-    "torch>=2.3" \
-    "numpy" "scipy" "pandas" "pyyaml" "tqdm" "juliacall" "python-dotenv"
+# Core scientific + ML
+RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+RUN pip3 install numpy scipy pandas scikit-learn pyyaml tqdm h5py
 
-# Final runtime image (smaller)
-FROM nvcr.io/nvidia/pytorch:24.09-py3
+# Bittensor
+RUN pip3 install bittensor
 
-COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-COPY --from=builder /root/.julia /root/.julia
+# PhysicsNeMo (NVIDIA)
+RUN pip3 install physicsnemo
 
-WORKDIR /workspace
+# NeuralOperator (community standard)
+RUN pip3 install neuraloperator
+
+# Causal + Symbolic
+RUN pip3 install econml pysr
+
+# Optional: Docker SDK for some validator features
+RUN pip3 install docker
+
+# Create app directory
+WORKDIR /app
 
 # Copy Hydrogen code
-COPY . /workspace/hydrogen
+COPY . /app
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=15s --start-period=10s --retries=3 \
-    CMD python -c "import torch, physicsnemo; print('CUDA:', torch.cuda.is_available()); print('PhysicsNeMo OK')" || exit 1
+# Install Hydrogen in editable mode
+RUN pip3 install -e .
 
-# Default entrypoint (can be overridden)
-ENTRYPOINT ["python", "-m", "hydrogen.validator.entrypoint"]
+# Default command
+CMD ["python3", "-m", "neurons.validator"]

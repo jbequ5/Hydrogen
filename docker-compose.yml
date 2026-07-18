@@ -5,71 +5,17 @@ services:
     build:
       context: .
       dockerfile: docker/validator/Dockerfile
-    image: hydrogen/validator:latest
-    container_name: hydrogen-validator
-    restart: unless-stopped
-
-    # Mount source code (for development)
-    volumes:
-      - .:/workspace/hydrogen
-      # Mount PDEBench data if you have it downloaded
-      - ./data/pdebench:/data/pdebench:ro
-
+    image: hydrogen-validator:latest
+    runtime: nvidia
     environment:
-      - CUDA_VISIBLE_DEVICES=0
-      - PYTHONPATH=/workspace/hydrogen
-      # Set to false to use synthetic data only
-      - HYDROGEN_USE_BENCHMARK=true
-      # Bittensor network settings (override as needed)
-      - BT_NETWORK=finney
-      - BT_NETUID=107
-
-    # Expose if you want to monitor the axon
-    ports:
-      - "8091:8091"
-
-    # GPU access
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-
-    command: >
-      python -m hydrogen.validator.entrypoint
-        --netuid ${BT_NETUID:-107}
-        --subtensor.network ${BT_NETWORK:-finney}
-
-  # Optional: Simple miner for local testing
-  miner:
-    build:
-      context: .
-      dockerfile: docker/validator/Dockerfile
-    image: hydrogen/validator:latest
-    container_name: hydrogen-miner
-    restart: unless-stopped
+      - NVIDIA_VISIBLE_DEVICES=all
     volumes:
-      - .:/workspace/hydrogen
-    environment:
-      - CUDA_VISIBLE_DEVICES=0
-      - PYTHONPATH=/workspace/hydrogen
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    command: >
-      python -m hydrogen.miner.entrypoint
-        --netuid ${BT_NETUID:-107}
-        --subtensor.network ${BT_NETWORK:-finney}
-    profiles:
-      - testing
+      - .:/app
+    command: python3 -m neurons.validator
 
-# Usage:
-#   docker compose up -d validator          # Run validator only
-#   docker compose --profile testing up -d      # Run both validator + miner
-#   docker compose logs -f validator
+  # Example: You can create additional profiles for specialized images
+  # validator-neuralop:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/validator/Dockerfile
+  #   # Add specific env or args if needed
