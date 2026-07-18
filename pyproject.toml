@@ -5,27 +5,29 @@ description = "Decentralized Physics-Informed Neural Operator Subnet for Bittens
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "bittensor>=8.0.0",
-    "torch>=2.3.0",
+    "bittensor>=9.0.0",
+    "torch>=2.4.0",
     "numpy>=1.26",
-    "scipy>=1.13",
-    "pandas>=2.2",
-    "scikit-learn>=1.5",
-    "pysr>=0.18",
-    "neuraloperator>=0.3.0",           # NEW: Core neural operator library
-    "physicsnemo>=1.0.0",            # NVIDIA PhysicsNeMo
-    "h5py>=3.11",
-    "pyyaml>=6.0",
-    "tqdm>=4.66",
-    "matplotlib>=3.8",
+    "scipy",
+    "pandas",
+    "scikit-learn",
+    "pyyaml",
+    "tqdm",
+    "h5py",
+    "pysr",
+    "neuraloperator",           # Core neural operator library
+    "physicsnemo",            # NVIDIA PhysicsNeMo / Modulus
+    "econml",                 # Causal inference
+    "docker",
 ]
 
 [project.optional-dependencies]
-test = [
-    "pytest>=8.0",
-    "pytest-cov>=5.0",
+validator = [
+    "bittensor[validator]",
+]
+miner = [
+    "bittensor[miner]",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[tool.setuptools.packages.find]
+where = ["."]
