@@ -1,6 +1,6 @@
 # Hydrogen Miner Docker Environment
 
-Uses the new client abstraction and AgenticMiner for clean, maintainable focused runs.
+Supports both mock and (future) real client modes.
 
 ## Focused Mode
 
@@ -8,13 +8,14 @@ Uses the new client abstraction and AgenticMiner for clean, maintainable focused
 CHALLENGE_ID=poisson_2d_v1 docker compose up miner
 ```
 
-Supports `DRY_RUN`, `ITERATIONS`, and `SUBMIT_THRESHOLD` via environment variables.
+## Environment Variables
+
+- `CHALLENGE_ID` — Focus on one challenge
+- `DRY_RUN` — Safe testing
+- `ITERATIONS` — Max cycles
+- `SUBMIT_THRESHOLD` — Score threshold for submission
+- `USE_REAL_CLIENT` — Set to `true` when real client is available (currently falls back to mock)
 
 ## Architecture
 
-- Uses `AgenticMiner` + `MockHydrogenClient` (easily swappable with real client later)
-- Clean separation between client and agent logic
-
-## Future
-
-When a real `HydrogenClient` is available, it can be plugged in with minimal changes.
+Uses the new client abstraction so swapping to a real `HydrogenClient` is straightforward.

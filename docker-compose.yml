@@ -28,4 +28,5 @@ services:
       - DRY_RUN=${DRY_RUN:-false}
       - ITERATIONS=${ITERATIONS:-8}
       - SUBMIT_THRESHOLD=${SUBMIT_THRESHOLD:-0.075}
+      - USE_REAL_CLIENT=${USE_REAL_CLIENT:-false}
     command: python examples/run_agentic_miner.py
