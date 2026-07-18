@@ -1,6 +1,6 @@
 # Hydrogen Miner Docker Environment
 
-High-quality, agent-optimized experience.
+Uses the new client abstraction and AgenticMiner for clean, maintainable focused runs.
 
 ## Focused Mode
 
@@ -8,19 +8,13 @@ High-quality, agent-optimized experience.
 CHALLENGE_ID=poisson_2d_v1 docker compose up miner
 ```
 
-Features:
-- Challenge-specific priors with system noise
-- Realistic iteration with gain tracking
-- Returns the actual best strategy
-- Performance summary + intelligent recommendations
+Supports `DRY_RUN`, `ITERATIONS`, and `SUBMIT_THRESHOLD` via environment variables.
 
-## Environment Variables
+## Architecture
 
-- `CHALLENGE_ID`
-- `DRY_RUN`
-- `ITERATIONS`
-- `SUBMIT_THRESHOLD`
+- Uses `AgenticMiner` + `MockHydrogenClient` (easily swappable with real client later)
+- Clean separation between client and agent logic
 
-## Output
+## Future
 
-Clean JSON summary with gain from baseline, best strategy, and recommended next actions.
+When a real `HydrogenClient` is available, it can be plugged in with minimal changes.
