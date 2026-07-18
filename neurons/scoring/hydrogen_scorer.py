@@ -1,13 +1,14 @@
-"""HydrogenScorer with 3 High-Level Objectives (45/30/25)
+"""HydrogenScorer with 3 High-Level Objectives + Pareto Front Computation
 
-Physics Fidelity : 45%
-Robustness       : 30%
-Accuracy         : 25%
+Objectives (default 45/30/25):
+- Physics Fidelity : 45%
+- Robustness       : 30%
+- Accuracy         : 25%
 
-Expanded fine-grained metrics for rich Landscape data.
+Includes Pareto front computation over the 3 objectives.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 import bittensor as bt
 
@@ -76,28 +77,21 @@ class HydrogenScorer:
             pde_type=plan.get("pde_type", "generic"),
         )
 
-        # === Expanded fine-grained metrics ===
         fine_grained = {
-            # Accuracy metrics
             "benchmark_mse": self._safe_get(train_result, "benchmark_mse", 0.0),
             "relative_l2_error": stress_result.get("relative_l2_error", 0.0),
             "max_error": stress_result.get("max_error", 0.0),
-
-            # Physics fidelity metrics
             "physics_residual": stress_result.get("physics_residual", 0.0),
             "divergence_error": stress_result.get("divergence_error", 0.0),
             "energy_stability": stress_result.get("energy_stability", 0.0),
             "boundary_violation": stress_result.get("boundary_violation", 0.0),
             "conservation_error": stress_result.get("conservation_error", 0.0),
-
-            # Robustness metrics
             "long_term_stability": stress_result.get("long_term_stability", 0.0),
             "stress_generalization": stress_result.get("stress_generalization", 0.0),
             "parameter_sensitivity": stress_result.get("parameter_sensitivity", 0.0),
             "noise_robustness": stress_result.get("noise_robustness", 0.0),
         }
 
-        # === 3 High-level objectives ===
         physics_fidelity = self._compute_physics_fidelity(fine_grained)
         robustness = self._compute_robustness(fine_grained)
         accuracy = self._compute_accuracy(fine_grained)
@@ -115,6 +109,37 @@ class HydrogenScorer:
             "stress_result": stress_result,
             "train_result": train_result,
         }
+
+    def compute_pareto_front(self, candidates: List[Dict[str, float]]) -> List[Dict[str, float]]:
+        """
+        Compute the Pareto front over the 3 high-level objectives.
+
+        Each candidate should be a dict with keys:
+            'physics_fidelity', 'robustness', 'accuracy'
+
+        Returns the list of non-dominated candidates.
+
+        A candidate A dominates B if A is better than or equal to B in all objectives
+        and strictly better in at least one.
+        """
+        pareto = []
+        for i, c1 in enumerate(candidates):
+            dominated = False
+            for j, c2 in enumerate(candidates):
+                if i == j:
+                    continue
+                if (c2["physics_fidelity"] >= c1["physics_fidelity"] and
+                    c2["robustness"] >= c1["robustness"] and
+                    c2["accuracy"] >= c1["accuracy"] and
+                    (c2["physics_fidelity"] > c1["physics_fidelity"] or
+                     c2["robustness"] > c1["robustness"] or
+                     c2["accuracy"] > c1["accuracy"])):
+                    dominated = True
+                    break
+            if not dominated:
+                pareto.append(c1)
+
+        return pareto
 
     def _compute_physics_fidelity(self, fine: dict) -> float:
         residual = 1.0 - min(1.0, fine.get("physics_residual", 0.5))
