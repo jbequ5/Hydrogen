@@ -1,146 +1,85 @@
-# SPEC.md — Hydrogen Technical Specification (Current Implementation)
+# Hydrogen Subnet Specification
 
-**Status:** Accurate reflection of the codebase as of July 18, 2026.
+**Status:** Active Development (July 2026)
 
----
+Hydrogen is a Bittensor subnet (SN63) focused on decentralized Physics-Informed Neural Operator (PINO) training for complex engineering simulations.
 
-## 1. Overview
+## Core Goals
 
-Hydrogen is a Bittensor subnet for decentralized discovery of better Physics-Informed Neural Operators. Miners submit training strategies. Validators run team-defined evaluation plans with hidden stress testing and hard physics gates. A causal reasoning layer (Landscape Agent) identifies what works and distills it into specialists.
+- Discover high-quality training strategies for physics-respecting neural surrogates.
+- Use hidden stress testing + hard physics gates to evaluate robustness.
+- Maintain strong anti-gaming properties through hidden evaluation data and adaptive difficulty.
+- Support multiple parallel challenges while keeping reward distribution reasonably balanced.
 
----
+## Current Architecture (as of July 2026)
 
-## 2. Miner Strategy JSON (Rich & Modular)
+### 1. Scoring System
 
-Miners can control many aspects of training via the strategy. Example:
+The validator uses a multi-objective scorer with three high-level objectives:
 
-```json
-{
-  "backbone": "fno",
-  "resolution": [128, 128],
+| Objective            | Default Weight | Description |
+|----------------------|----------------|-------------|
+| `physics_fidelity`   | 45%            | How well the model respects physics laws (residuals, divergence, conservation, boundaries) |
+| `robustness`         | 30%            | Performance under stress conditions + long-term stability |
+| `accuracy`           | 25%            | Performance on benchmark / hold-out data |
 
-  "pino": {
-    "loss_vector": {
-      "pde_residual": 1.0,
-      "conservation_mass": 1.2,
-      "boundary": 0.6
-    }
-  },
+A **combined final score** is computed from these three. Only submissions that beat the current best combined score on a challenge receive meaningful weight.
 
-  "optimizer": "AdamW",
-  "learning_rate": 0.0008,
-  "weight_decay": 1e-4,
+### 2. ChallengeWinnerTracker
 
-  "scheduler": "CosineAnnealingLR",
+Inspired by Minos-style round-only winner logic:
 
-  "weight_init": "kaiming_normal",
+- Tracks the best combined score **per challenge**.
+- Uses **exponential decay** on old performance.
+- Only miners who set a new best combined score on a challenge contribute strongly to weights.
+- Includes **participation dust** for recent miners who do not win.
+- Produces a **winner-heavy + dust** weight distribution for `set_weights()`.
 
-  "grad_clip_norm": 1.0,
-  "accumulation_steps": 4,
-  "use_amp": true,
+### 3. Validator
 
-  "physics_loss_weight": 0.8,
+- Owns `HydrogenScorer` and `ChallengeWinnerTracker`.
+- Retrieves strategies via `StrategyStore`.
+- Scores submissions and updates the tracker per challenge.
+- Computes weights using the tracker and submits via standard `set_weights()`.
+- Supports dry-run mode.
 
-  "early_stop_patience": 15,
+### 4. Strategy Handling
 
-  "batch_size": 8,
-  "epochs": 120,
+- `StrategyStore` abstraction with `LocalFileStrategyStore` implementation.
+- Designed to be easily swapped for a platform-backed store later.
+- Currently uses local JSON files for development/testing.
 
-  "curriculum_learning": {
-    "enabled": true,
-    "start_resolution": [64, 64],
-    "end_resolution": [128, 128],
-    "ramp_epochs": 40
-  },
+### 5. Emissions
 
-  "uq_config": {
-    "enabled": true,
-    "method": "deep_ensemble",
-    "num_members": 4
-  },
+Currently uses **standard Yuma Consensus** miner emissions via `set_weights()`.
 
-  "model_kwargs": {
-    "modes": 32,
-    "width": 64
-  }
-}
-```
+A more advanced hybrid emissions model (Breakthrough Bounties + Decaying Stipends + treasury rollover) is planned but **not active** at this time.
 
-**Note:** Miners do **not** control data splits or hidden stress conditions. These are defined by the team via `get_evaluation_plan()`.
+## Key Components
 
----
+| Component                        | Location                                      | Status |
+|----------------------------------|-----------------------------------------------|--------|
+| `HydrogenScorer`                 | `neurons/scoring/hydrogen_scorer.py`          | Active |
+| `ChallengeWinnerTracker`         | `neurons/scoring/challenge_winner_tracker.py` | Active |
+| `Validator`                      | `neurons/validator.py`                        | Active |
+| `StrategyStore`                  | `neurons/strategy/strategy_store.py`          | Active |
+| MCP Server                       | `hydrogen/miner/mcp_server.py`                | Active |
 
-## 3. Evaluation Plans
+## Current Limitations
 
-Defined in `hydrogen/evaluation/plan.py`. The validator uses this to decide exactly what data and conditions to use for each challenge.
+- Strategy retrieval is still primarily local-file based.
+- No hybrid bounty/treasury layer yet.
+- Single-validator focused (multi-validator consistency not yet stress-tested).
+- Emissions are standard Yuma only.
 
----
+## Future Work (Not in current scope)
 
-## 4. Stress Testing & Physics Gates
+- Hybrid emissions model (75/25 Breakthrough Bounties + Decaying Top-2 Stipend)
+- Per-challenge bounty pools with daily/round reset + treasury rollover
+- Stronger anti-self-dealing / capture protections
+- Full platform-backed strategy store
+- Multi-validator testing and canonical ranking integration
 
-- Procedurally generated hidden conditions per challenge.
-- Adaptive difficulty with anti-sandbagging (EMA + noise + floor).
-- Hard gates: divergence, energy stability, boundary conditions, rollout stability, negative energy.
-- Real `u_true` loaded from benchmark test split.
+## Versioning
 
----
-
-## 5. Current Modularity (What Miners Can Control)
-
-| Category              | Fields                                      | Impact on Causal Learning |
-|-----------------------|---------------------------------------------|---------------------------|
-| Backbone              | fno, deeponet, uno, physicsnemo_fno         | High                      |
-| Optimizer             | AdamW, Adam, SGD                            | High                      |
-| Learning Rate         | Any float                                   | High                      |
-| Scheduler             | Cosine, Step, ReduceLROnPlateau             | Medium-High               |
-| Weight Initialization | kaiming_*, xavier_*, normal                 | Medium                    |
-| Gradient Clipping     | grad_clip_norm                              | Medium                    |
-| Mixed Precision       | use_amp                                     | Medium                    |
-| Gradient Accumulation | accumulation_steps                          | Low-Medium                |
-| Physics Loss Weight   | physics_loss_weight                         | High                      |
-| Early Stopping        | early_stop_patience                         | Low                       |
-| Curriculum            | start/end resolution, ramp_epochs           | High                      |
-| UQ Configuration      | method, num_members, calibration_target     | Medium                    |
-| Model-specific        | model_kwargs (modes, width, etc.)           | High                      |
-
----
-
-## 6. Analysis: Is This the Optimal Customization Path?
-
-**Pros of high modularity:**
-- Gives the Landscape Agent rich, high-dimensional data to learn causal effects from.
-- Allows genuinely novel training strategies to emerge.
-- Lowers barrier for creative researchers (they can experiment with many levers).
-- Aligns with the goal of decentralized discovery.
-
-**Cons / Risks:**
-- Increased complexity for miners (strategy space is large).
-- Higher risk of spurious correlations or gaming (e.g., tuning many knobs to barely pass gates).
-- Validator code becomes more complex.
-- Some knobs may have weak or noisy causal signals.
-
-**Recommendation:**
-
-This level of modularity is **mostly optimal** for Phase 0/1, with two caveats:
-
-1. **Document recommended ranges** and sensible defaults clearly (e.g., in docs or via `hydrogen-miner baseline`).
-2. **Let the Landscape Agent learn** which knobs actually matter. Over time it can propose simpler, high-signal strategies to miners.
-
-We should **not** arbitrarily limit customization early. The causal layer is designed exactly to discover which combinations are valuable.
-
-If complexity becomes a problem later, we can add "strategy templates" or "recommended presets" while still allowing advanced users full control.
-
----
-
-## 7. Honest Gaps
-
-- Single validator (no median consensus yet)
-- No advanced multi-teacher distillation pipeline yet
-- No full on-chain mechanics yet
-- Symbolic Layer (Julia) not yet integrated
-
----
-
-## 8. Summary
-
-Hydrogen currently offers a highly modular training interface. Miners can control most meaningful training decisions through the strategy JSON. The Landscape Agent is positioned to learn causally from the effects of these choices. This design maximizes the chance of discovering genuinely better physics-informed training strategies in a decentralized way.
+This document reflects the state of the codebase after integration of the `ChallengeWinnerTracker` and `StrategyStore` (July 2026).
