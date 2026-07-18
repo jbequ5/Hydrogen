@@ -1,7 +1,6 @@
-"""Causal Knowledge Base with Heterogeneous Treatment Effects (CATE).
+"""Causal Knowledge Base with Heterogeneous Treatment Effects (improved).
 
-Now supports estimating how treatment effects vary across contexts
-(e.g. high vs low Reynolds, different permeability ranges).
+Better CATE estimation with effects for top features.
 """
 
 import json
@@ -164,12 +163,6 @@ class CausalKnowledgeBase:
         treatment_key: str = "pde_residual_weight",
         min_samples: int = 40,
     ) -> Dict[str, Any]:
-        """
-        Estimate Heterogeneous Treatment Effects (CATE).
-
-        Returns average treatment effect + simple stratification
-        by feature values (e.g. high vs low Reynolds).
-        """
         key = self._make_key(challenge_id, backbone)
         artifacts = load_symbolic_artifacts(
             artifact_type="causal_observation",
@@ -181,7 +174,6 @@ class CausalKnowledgeBase:
         if len(filtered) < min_samples:
             return {"status": "insufficient_data", "n": len(filtered)}
 
-        # Build dataset
         data = []
         for art in filtered:
             content = art.get("content", {})
@@ -211,35 +203,33 @@ class CausalKnowledgeBase:
         T = df["treatment"].values
         Y = df["outcome"].values
 
-        # Simple CATE via interaction model
         X_interact = np.column_stack([X, X * T.reshape(-1, 1)])
 
         mu_y = cross_val_predict(Ridge(), X_interact, Y, cv=5)
         residual_y = Y - mu_y
 
-        # Estimate interaction effects
         from sklearn.linear_model import LinearRegression
         interaction_model = LinearRegression().fit(X_interact, residual_y)
 
-        # Average treatment effect
         ate = np.mean(T * residual_y) / (np.var(T) + 1e-8)
 
-        # Simple stratification (e.g. by first feature)
-        if len(feature_cols) > 0:
-            feat_name = feature_cols[0]
-            high_mask = X[:, 0] > np.median(X[:, 0])
-            ate_high = np.mean(T[high_mask] * residual_y[high_mask]) / (np.var(T[high_mask]) + 1e-8)
-            ate_low = np.mean(T[~high_mask] * residual_y[~high_mask]) / (np.var(T[~high_mask]) + 1e-8)
-        else:
-            ate_high = ate_low = ate
+        # Improved: estimate effects for top 2 features
+        feature_effects = {}
+        for i, feat_name in enumerate(feature_cols[:2]):
+            high_mask = X[:, i] > np.median(X[:, i])
+            if np.sum(high_mask) > 5 and np.sum(~high_mask) > 5:
+                ate_high = np.mean(T[high_mask] * residual_y[high_mask]) / (np.var(T[high_mask]) + 1e-8)
+                ate_low = np.mean(T[~high_mask] * residual_y[~high_mask]) / (np.var(T[~high_mask]) + 1e-8)
+                feature_effects[feat_name] = {
+                    "ate_high": float(ate_high),
+                    "ate_low": float(ate_low),
+                }
 
         result = {
             "status": "success",
-            "method": "interaction_model_cate",
+            "method": "interaction_model_cate_v2",
             "ate": float(ate),
-            "ate_high": float(ate_high),
-            "ate_low": float(ate_low),
-            "feature": feature_cols[0] if feature_cols else None,
+            "feature_effects": feature_effects,
             "n_samples": len(Y),
             "challenge_id": challenge_id,
             "backbone": backbone,

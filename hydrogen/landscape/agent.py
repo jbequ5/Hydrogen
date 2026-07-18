@@ -1,12 +1,16 @@
-"""Landscape Agent with CATE + Novelty-Aware Distillation.
+"""Landscape Agent with CATE + Novelty + Automatic Prior Generation.
 
-Implements both heterogeneous treatment effects and improved novelty scoring.
+After successful distillation, improved (noisy) priors are generated.
 """
 
 import time
 from typing import Dict, Any, List, Optional
 
 import numpy as np
+
+import json
+
+import os
 
 from .causal_knowledge_base import CausalKnowledgeBase
 from .storage import save_symbolic_artifact, load_symbolic_artifacts
@@ -61,12 +65,11 @@ class LandscapeAgent:
                 if causal_result.get("status") == "success":
                     print(f"  [{challenge_id}/{backbone}] Causal ATE: {causal_result.get('ate', 0):.4f}")
 
-                # Also estimate heterogeneous effects
                 cate_result = self.kb.estimate_heterogeneous_effects(
                     challenge_id, backbone=backbone
                 )
                 if cate_result.get("status") == "success":
-                    print(f"  [{challenge_id}/{backbone}] CATE estimated (high vs low feature)")
+                    print(f"  [{challenge_id}/{backbone}] CATE estimated")
 
         self.last_update = int(time.time())
         print("[Landscape] Daily update complete.")
@@ -77,9 +80,6 @@ class LandscapeAgent:
         backbone: str = "PINO",
         top_k: int = 3,
     ) -> List[Dict[str, Any]]:
-        """
-        Novelty + Causal aware candidate selection.
-        """
         candidates = []
 
         weight_artifacts = load_symbolic_artifacts(
@@ -101,10 +101,8 @@ class LandscapeAgent:
             content = artifact.get("content", {})
             loss_vector = content.get("loss_vector", {})
 
-            # Simple novelty score: average absolute deviation from current best
             novelty = 0.0
             if loss_vector:
-                # Compare to a simple uniform prior as baseline
                 avg_dev = np.mean([abs(v - 1.0) for v in loss_vector.values()])
                 novelty = min(1.0, avg_dev)
 
@@ -122,12 +120,44 @@ class LandscapeAgent:
             }
             candidates.append(candidate)
 
-        # Sort by combined causal + novelty score
         candidates = sorted(candidates, key=lambda x: x["combined_score"], reverse=True)
         return candidates[:top_k]
 
+    def generate_improved_priors(self, challenge_id: str, backbone: str = "PINO", noise_level: float = 0.025):
+        """
+        Generate improved (noisy) priors after successful distillation.
+        """
+        best_specialist = bank.get_best_for_challenge(challenge_id, backbone)
+        if not best_specialist:
+            return None
+
+        loss_vector = best_specialist.get("strategy_config", {}).get("pino", {}).get("loss_vector", {})
+        if not loss_vector:
+            return None
+
+        import random
+        improved = {}
+        for k, v in loss_vector.items():
+            noise = random.gauss(0, noise_level)
+            improved[k] = max(0.05, v * (1 + noise))
+
+        # Save as published prior
+        os.makedirs("./data/published_priors", exist_ok=True)
+        filepath = f"./data/published_priors/{challenge_id}_{backbone}_improved.json"
+        with open(filepath, "w") as f:
+            json.dump({
+                "challenge_id": challenge_id,
+                "backbone": backbone,
+                "loss_vector": improved,
+                "source": "auto_generated_after_distillation",
+                "timestamp": int(time.time()),
+            }, f, indent=2)
+
+        print(f"[Landscape] Generated improved priors for {challenge_id} -> {filepath}")
+        return improved
+
     def run_full_daily_cycle(self):
-        print("\n[Landscape] === Starting Full Daily Cycle (Causal + Novelty) ===")
+        print("\n[Landscape] === Starting Full Daily Cycle (Causal + Novelty + Auto-Priors) ===")
 
         self.run_daily_update()
 
@@ -180,6 +210,9 @@ class LandscapeAgent:
                             "novelty_score": candidate.get("novelty_score"),
                         },
                     )
+
+                    # NEW: Generate improved priors after successful distillation
+                    self.generate_improved_priors(challenge_id, candidate["backbone"])
 
         print("[Landscape] === Daily Cycle Complete ===\n")
 
