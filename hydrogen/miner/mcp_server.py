@@ -1,7 +1,7 @@
-"""MCP-style Server with optimized Redis connection pooling.
+"""MCP-style Server with Redis Sentinel + fallback support.
 
-Uses a properly configured async Redis connection pool for better performance
-and resource usage.
+Supports high-availability Redis via Sentinel, with graceful fallback
+to direct Redis or file-based storage.
 """
 
 import os
@@ -12,10 +12,10 @@ import uuid
 import asyncio
 try:
     import redis.asyncio as aioredis
-    from redis.asyncio.connection import ConnectionPool
+    from redis.asyncio.sentinel import RedisSentinel
 except ImportError:
     aioredis = None
-    ConnectionPool = None
+    RedisSentinel = None
 
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import StreamingResponse
@@ -26,30 +26,50 @@ from hydrogen.miner.client import MockHydrogenClient
 
 app = FastAPI(
     title="Hydrogen Mining MCP Server",
-    description="MCP-style server with optimized Redis sessions.",
-    version="1.0.0",
+    description="MCP-style server with Redis Sentinel high availability.",
+    version="1.1.0",
 )
 
 # ============================================================
-# Redis Connection Pool (Optimized)
+# Redis / Sentinel Configuration
 # ============================================================
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = os.getenv("REDIS_URL")
+REDIS_SENTINEL_HOSTS = os.getenv("REDIS_SENTINEL_HOSTS")  # e.g. "host1:26379,host2:26379"
+SENTINEL_SERVICE_NAME = os.getenv("REDIS_SENTINEL_SERVICE", "mymaster")
 SESSION_TTL_SECONDS = 86400  # 24 hours
 
 redis_client = None
 
-if aioredis and ConnectionPool:
+if aioredis:
     try:
-        pool = ConnectionPool.from_url(
-            REDIS_URL,
-            decode_responses=True,
-            max_connections=50,           # Reasonable pool size
-            socket_connect_timeout=5,
-            socket_keepalive=True,
-            health_check_interval=30,     # Keep connections healthy
-        )
-        redis_client = aioredis.Redis(connection_pool=pool)
+        if REDIS_SENTINEL_HOSTS:
+            # Redis Sentinel mode (High Availability)
+            sentinel_hosts = [
+                tuple(h.split(":")) for h in REDIS_SENTINEL_HOSTS.split(",")
+            ]
+            sentinel = RedisSentinel(
+                sentinel_hosts,
+                sentinel_kwargs={"password": os.getenv("REDIS_SENTINEL_PASSWORD")},
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_keepalive=True,
+            )
+            redis_client = sentinel.master_for(
+                SENTINEL_SERVICE_NAME,
+                socket_timeout=5,
+                health_check_interval=30,
+            )
+        elif REDIS_URL:
+            # Direct Redis mode
+            redis_client = aioredis.from_url(
+                REDIS_URL,
+                decode_responses=True,
+                max_connections=50,
+                socket_connect_timeout=5,
+                socket_keepalive=True,
+                health_check_interval=30,
+            )
     except Exception:
         redis_client = None
 
@@ -129,7 +149,12 @@ def verify_api_key(x_api_key: str = Header(None)):
 
 @app.get("/health")
 async def health():
-    backend = "redis" if redis_client else "file"
+    if REDIS_SENTINEL_HOSTS:
+        backend = "redis-sentinel"
+    elif redis_client:
+        backend = "redis"
+    else:
+        backend = "file"
     return {"status": "ok", "session_backend": backend}
 
 
