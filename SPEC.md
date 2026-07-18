@@ -1,167 +1,155 @@
-# SPEC.md — Hydrogen Technical Specification (Consolidated, Phase 0 MVP Focus) v2.5
+# SPEC.md — Hydrogen Technical Specification (Current State)
 
-**Status**: Deduplicated and aligned from previous Sepc.md / Launch_Spec.md versions. Removed repeated SciML dependency blocks, duplicated Phase 1 descriptions, and section numbering artifacts. Full historical detail preserved in git history and Appendices/. This is the single source of truth going forward.
+**Last Updated:** July 18, 2026
+
+This document describes the **actual implemented design** of Hydrogen as of the current codebase, rather than the original ambitious vision.
 
 ---
 
-## 1. System Overview & Core Loop
+## Overview
 
-Hydrogen is a Bittensor subnet that turns physics simulation into a compounding, incentive-aligned knowledge economy.
+Hydrogen is a Bittensor subnet for the decentralized discovery of better **Physics-Informed Neural Operators** for solving Partial Differential Equations (PDEs). 
 
-**Core Loop (Phase 0 MVP)**:
+Miners submit training strategies. Validators run team-defined evaluation plans that include hidden stress testing with hard physics constraints. A causal reasoning layer (the Landscape Agent) identifies what actually improves performance and distills successful strategies into reusable specialists.
+
+The system is designed so that **only verifiable, physics-correct generalization** reliably earns rewards.
+
+---
+
+## Current Architecture
+
 ```
-Challenge released (PDE + train/holdout/stress + symbolic metadata)
-  → Miners submit strategy JSON (backbone, loss_vector, curriculum, UQ, optional custom_data)
-  → Validators (pinned Docker) train on public split → evaluate holdout → run hidden stress test
-  → Hard physics gates (binary pass/fail) → Score = log(E_baseline) - log(E_submission)
-  → Median consensus across ≥3 validators
-  → Top-4 emissions (40/30/20/10) + novelty/symbolic bonuses
-  → Every fragment → Landscape Agent (Double ML causal inference on DAG)
-  → Daily baseline update proposal + weekly specialist distillation (top-K → ONNX)
-```
-
-**Roles & Economics (Phase 0)**:
-- Top 4 miners per challenge: 40/30/20/10 split of challenge budget (improvement > 0 required).
-- Validators: ~41% share for reliable physics gating + UQ audit + consensus participation.
-- Owner/Landscape: 18% + time-locked treasury for agent compute, distillation, infra.
-- Submission fee: 0.1 TAO (burned on pre-check failure).
-- Novelty bonus + symbolic bonus gated on measurable improvement.
-
-**Hard Physics Gates (Phase 0 — start simple)**:
-- Boundary satisfaction: ‖u - u_BC‖_{2} / ‖u_BC‖_{2} < 1e-3
-- Rollout stability (100 steps): ‖E(t=100) - E(0)‖ / E(0) < 0.01
-- UQ calibration (90% PI coverage): |coverage - 0.90| < 0.02
-- Mass conservation & energy dissipation added for relevant PDEs (NS, Burgers, etc.)
-
-Hard failure → score = 0. Physics is binary.
-
----
-
-## 2. Supported Backends & Tooling (Tiered, Phase 0 Starts Simple)
-
-**Phase 0 MVP (Ship first)**: PyTorch + PhysicsNeMo + NeuralOperator (pinned `hydrogen/validator:pino-v0.1` image). Deterministic flags + fixed seeds.
-
-**Later tiers** (post-MVP):
-- JAX (jNO/Equinox)
-- Julia/SciML (NeuralOperators.jl + Lux + ModelingToolkit.jl) via juliacall or sidecar
-
-Cross-framework validation via ONNX where possible.
-
-**Symbolic Layer (Phase 0 MVP)**: Pre-computed JSON metadata per challenge (generated offline with ModelingToolkit.jl principles or rules). Contains symmetries, conservation laws, dimensionless groups, suggested loss weights, boundary types, validity domain. Used for auto loss weighting in miner strategies and adaptive gate thresholds.
-
-Full runtime MTK integration and acausal composition deferred to Phase 1+.
-
----
-
-## 3. Miner Interface
-
-Strategy JSON schema (Phase 0):
-```json
-{
-  "challenge_id": "poisson_2d_v1",
-  "hotkey": "5F...",
-  "backbone": "PINO",
-  "resolution": [128, 128],
-  "pino": {
-    "loss_vector": { "pde_residual": 1.0, "conservation_mass": 1.5, "boundary": 0.5 },
-    "physics_loss_type": "pde_residual",
-    "boundary_handling": "ghost_cells"
-  },
-  "optimizer": "AdamW",
-  "learning_rate": 0.001,
-  "curriculum_learning": { "enabled": true, "start_resolution": [64, 64], "end_resolution": [128, 128], "ramp_epochs": 50 },
-  "uq_config": { "method": "deep_ensemble", "num_members": 4, "calibration_target": 0.90 }
-}
+Miners
+  ↓ submit strategy JSON (backbone, loss weights, curriculum, UQ config)
+Validators
+  ↓ execute get_evaluation_plan() → train on benchmark + hidden stress test + physics gates
+Landscape Agent
+  ↓ causal inference (Double ML + CATE) + novelty scoring
+  ↓ propose distillation → distill → register in Specialist Bank
+  ↓ auto-generate improved published priors
+Specialist Bank
+  ↓ versioned, validated specialists with metadata
 ```
 
-Miners pay 0.1 TAO fee. Last submission per challenge counts. No weights uploaded.
+---
+
+## Key Implemented Components
+
+| Component                    | Status      | Description |
+|--------------------------------|-------------|-------------|
+| **Backbone Registry**          | Complete    | Supports `physicsnemo_fno`, `fno`, `deeponet`, `uno` |
+| **Unified Trainer**            | Complete    | `get_model()` + training loop with validation support |
+| **Benchmark Loader**           | Complete    | PDEBench + synthetic fallback + NeuralOperator extensibility |
+| **Evaluation Plans**           | Complete    | `get_evaluation_plan(challenge_id, backbone)` — team-controlled |
+| **Adaptive Stress Difficulty** | Complete    | EMA + noise + conservative floor (anti-sandbagging) |
+| **Real Ground Truth**          | Complete    | `u_true` loaded from benchmark test split |
+| **Landscape Agent**            | Advanced    | Double ML + CATE, novelty-aware distillation proposals, auto prior generation |
+| **Specialist Bank**            | Functional  | Register, query, and manage distilled specialists |
+| **Emission Mechanics**         | Complete    | 75% Breakthrough Bounties + 25% Decaying Top-2 Stipend |
 
 ---
 
-## 4. Validator Specification
+## How Scoring Works
 
-Pinned Docker images with PhysicsNeMo, deterministic PyTorch settings, and physics gate evaluators.
+### Data Flow
 
-Validation pipeline (high level):
-1. Load challenge splits + symbolic metadata.
-2. Train / configure backbone per strategy JSON (seed = derive_seed(challenge_id, validator_hotkey)).
-3. Evaluate on public holdout.
-4. Run hidden stress test (procedural + The Well slices where applicable).
-5. Apply hard + soft physics gates.
-6. Compute score and UQ metrics.
-7. Return result for median consensus.
+For any `(challenge_id, backbone)`:
 
-Reproducibility note: Strict seeds + `torch.use_deterministic_algorithms(True)`. Tolerance bands or canonical cloud instances recommended for consensus edge cases. Full training logs + model hash for auditability.
+1. **Train** on the benchmark training split.
+2. **Stress Test** using procedurally generated hidden conditions (with adaptive difficulty).
+3. **Evaluate** using real ground truth (`u_true`) from the benchmark test split.
+4. Apply **hard physics gates** (divergence, energy stability, boundary conditions, rollout stability).
+5. If any hard gate fails → score = 0.
+6. Otherwise, compute **log-space improvement** over the current baseline.
 
----
+### Score Calculation
 
-## 5. Challenge Specification (Phase 0 MVP: 3 PDEs)
+```python
+improvement = log(E_baseline) - log(E_submission)
+score = improvement   # (plus soft factors in future)
+```
 
-| ID | Problem | Dim | Physics | Reference |
-|----|---------|-----|---------|-----------|
-| 1 | Poisson | 2D | Elliptic | PhysicsNeMo |
-| 2 | Darcy | 2D | Elliptic, variable coeff | PhysicsNeMo / PDEBench |
-| 3 | Burgers | 1D/2D | Nonlinear advection/shocks | PhysicsNeMo |
-
-Each provides: public train/holdout, hidden stress test (seeded procedural + Well slices), symbolic metadata JSON.
-
-Stress test generation: Deterministic from challenge_id. Includes parameter/geometry shifts + curated Well dataset slices mapped per PDE family.
+The **baseline** is the best error achieved so far on hidden stress conditions.
 
 ---
 
-## 6. Landscape Agent
+## Strategy JSON (What Miners Submit)
 
-- Ingests every StrategyFragment (config, score, stress_pass, UQ, lineage).
-- Daily: Double ML (econml/dowhy or HistGradientBoosting) on fragment DAG per problem family → causal effects + interactions → baseline proposal.
-- Weekly: Top-K distillation → ONNX specialists (regression-tested on same stress tests) → publish to Specialist Bank with validity domain + symbolic metadata.
-- Initially owner-operated / funded. Storage: Parquet + lightweight DB or IPFS-backed.
+Miners submit rich strategy JSONs containing:
+- `backbone`
+- `loss_vector`
+- Curriculum settings
+- UQ configuration
+- Optimizer / learning rate / epochs
 
----
-
-## 7. Emission & Incentive Mechanics (Phase 0)
-
-Challenge budget = total_subnet_emission / min(active_challenges, 10).
-
-Top-4 split (improvement > 0): 40% / 30% / 20% / 10%.
-Novelty bonus (5%, improvement-gated) + symbolic bonus (2%, >5% improvement).
-Bounty accumulation until breakthrough.
-Validators paid for completeness + physics audit reliability.
-
-See roadmap.md for full phased economics and risk mitigations.
+**Miners do NOT control data splits or stress conditions.** These are defined exclusively by the team in `get_evaluation_plan()`.
 
 ---
 
-## 8. Phase 0 MVP Exit Criteria (Ship These First)
+## Evaluation Plans (Team-Controlled)
 
-- 3 PDE challenges live with reproducible data + symbolic metadata.
-- ≥3 operational validators on pinned images.
-- ≥10 unique miners submitting.
-- Baseline log-improvement > 0.02/challenge averaged over 30 epochs.
-- Landscape producing causal baseline updates that measurably improve next round.
-- Working miner CLI + Python SDK with local validation helper.
-- Deterministic validation harness + audit logs.
+The core routing logic lives in `hydrogen/evaluation/plan.py`:
 
----
+```python
+def get_evaluation_plan(challenge_id, backbone, hotkey):
+    return {
+        "train_loader": get_benchmark_loader(challenge_id, split="train"),
+        "stress_conditions": generate_stress_conditions(challenge_id, difficulty=adaptive),
+        "benchmark_loader": get_benchmark_loader(challenge_id, split="test"),
+        "adaptive_difficulty": get_adaptive_difficulty(hotkey),
+    }
+```
 
-## 9. Later Phases (High-Level References)
-
-Phase 1: LoRA adapters, custom data (incl. Abaqus ODB/fil ingestion), data royalties, 20-30 specialists in Bank, symbolic metadata preservation in distillation.
-
-Phase 2: Multi-physics (FSI, CHT, thermo-elasticity) with six-track leaderboards (Monolith / Composition / Specialist-Only / Symbolic tracks). Go/No-Go for 3D.
-
-Phase 3: 3D foundations → turbulence bridge → multi-physics rollout → Foundation Operator (LPM) with TEE fine-tuning API + edge HIL deployment.
-
-Full details on composition, agent swarms (DID/A2A/reputation/slashing), Specialist Bank marketplace, and edge codegen (MTK → CUDA/VHDL) are in roadmap.md and historical appendices. These are explicitly deferred until Phase 0 flywheel spins autonomously.
+This function is **team-controlled**. Validators simply execute whatever plan is defined here.
 
 ---
 
-## 10. Open Technical Questions & Mitigations (Being Addressed in Scaffolding)
+## Landscape Agent
 
-- Reproducibility across heterogeneous GPUs → tolerance + canonical images + audit logs.
-- Julia interop in Docker → start with pre-computed metadata; add juliacall/sidecar post-MVP.
-- Bittensor custom emission split & fees → standard UID scoring + post-processing layer or custom reward function in initial implementation.
-- Data hosting → HF Datasets + CDN for core; IPFS for custom miner data.
+The Landscape Agent performs:
+- Causal inference using Double Machine Learning + Heterogeneous Treatment Effects (CATE)
+- Novelty scoring when ranking distillation candidates
+- Only proposes distillation when causal effect is positive
+- Automatically generates improved (noisy) published priors after successful distillation
+
+It maintains a growing causal knowledge base and helps the system compound knowledge over time.
 
 ---
 
-*End of consolidated SPEC.md v2.5. Previous duplicated content removed for maintainability. Historical versions in git.*
+## Emission Mechanics (75/25 Model)
+
+- **75%** → Breakthrough Bounties (paid on new stress test records, with cooldown + accumulation)
+- **25%** → Decaying Top-2 Stipend (only current leaders; requires minimum improvement; decays without progress)
+
+Strong anti-gaming features are built in.
+
+---
+
+## Anti-Gaming Measures
+
+- Hidden procedural stress tests (miners never see the exact conditions)
+- Hard physics gates (binary pass/fail)
+- Adaptive stress difficulty with anti-sandbagging (EMA + noise + floor)
+- Real ground truth from benchmark test splits
+- No miner control over data splits or evaluation conditions
+- Validator is the executor; the team defines the rules
+
+---
+
+## Current Limitations (Honest)
+
+- Single validator logic (no median consensus yet)
+- No Julia Symbolic Layer / ModelingToolkit integration yet
+- Distillation pipeline is basic (not yet multi-teacher + full ONNX workflow)
+- No full on-chain pallet mechanics yet
+
+---
+
+## Philosophy
+
+Hydrogen is built on the principle that **the things that pay should be the things that matter scientifically**:
+- Physics correctness under unseen conditions
+- Verifiable generalization
+- Causal understanding of what actually improves performance
+
+The incentive structure is the product.
