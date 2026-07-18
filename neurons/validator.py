@@ -1,7 +1,6 @@
-"""Hydrogen Validator with ChallengeWinnerTracker integration.
+"""Hydrogen Validator with StrategyStore integration.
 
-Minos-style round/challenge winner heavy weighting with exponential decay
-and participation dust.
+Uses ChallengeWinnerTracker + StrategyStore for clean strategy handling.
 """
 
 import time
@@ -10,6 +9,7 @@ import bittensor as bt
 
 from neurons.scoring.hydrogen_scorer import HydrogenScorer
 from neurons.scoring.challenge_winner_tracker import ChallengeWinnerTracker
+from neurons.strategy.strategy_store import LocalFileStrategyStore, StrategyStore
 
 
 class Validator:
@@ -22,6 +22,11 @@ class Validator:
         self.scorer = HydrogenScorer(config)
         self.tracker = ChallengeWinnerTracker(decay_factor=0.85)
 
+        # Strategy storage / retrieval
+        self.strategy_store: StrategyStore = LocalFileStrategyStore(
+            storage_dir=getattr(config, "strategy_storage_dir", "./strategies")
+        )
+
         self.active_challenges = getattr(config, "active_challenges", None) or [
             "poisson_2d_v1", "darcy_2d_v1", "burgers_v1"
         ]
@@ -33,13 +38,10 @@ class Validator:
         while True:
             try:
                 self.metagraph.sync()
-                scores = self._evaluate_miners()
+                self._evaluate_miners()
 
-                if scores:
-                    if self.dry_run:
-                        bt.logging.info(f"[DRY RUN] Scores computed")
-                    else:
-                        self._set_weights()
+                if not self.dry_run:
+                    self._set_weights()
 
                 self._log_monitoring()
 
@@ -48,35 +50,26 @@ class Validator:
 
             time.sleep(self.config.evaluation_interval)
 
-    def _evaluate_miners(self) -> dict:
-        scores = {}
-
+    def _evaluate_miners(self):
         for uid in self.metagraph.uids:
             hotkey = self.metagraph.hotkeys[uid]
-            strategy = self._get_strategy_for_uid(uid)
+            strategy = self.strategy_store.get_strategy(hotkey)
 
             if not strategy:
                 continue
 
             try:
-                # Scorer returns rich data including per-challenge combined score
                 result = self.scorer.score_strategy(uid, hotkey, strategy)
 
-                # Update tracker per challenge
                 challenge_id = strategy.get("challenge_id", "default")
                 combined_score = result.get("combined_score", 0.0)
 
                 self.tracker.update(hotkey, challenge_id, combined_score)
 
-                scores[uid] = combined_score
-
             except Exception as e:
-                bt.logging.warning(f"Failed to score uid {uid}: {e}")
-
-        return scores
+                bt.logging.warning(f"Failed to score uid {uid} ({hotkey[:16]}...): {e}")
 
     def _set_weights(self):
-        # Use tracker to compute winner-heavy + dust weights
         weights = self.tracker.get_weights(
             active_challenges=self.active_challenges,
             winner_weight=0.65,
@@ -84,7 +77,6 @@ class Validator:
             dust_decay=0.6,
         )
 
-        # Convert to UID-based arrays for set_weights
         uids = []
         weight_values = []
 
@@ -98,7 +90,6 @@ class Validator:
             bt.logging.warning("No valid hotkeys for weight submission")
             return
 
-        # Normalize
         total = sum(weight_values)
         if total > 0:
             weight_values = [w / total for w in weight_values]
@@ -110,23 +101,15 @@ class Validator:
             wait_for_finalization=True,
         )
 
-        bt.logging.info(f"Weights submitted for {len(uids)} miners (winner-heavy + dust)")
+        bt.logging.info(f"Weights submitted for {len(uids)} miners")
 
     def _log_monitoring(self):
         stats = self.tracker.get_stats()
         bt.logging.info(
-            f"Challenges tracked: {stats['tracked_challenges']} | "
-            f"Current leaders: {stats['current_leaders']} | "
-            f"Miners tracked: {stats['miners_tracked']}"
+            f"Challenges: {stats['tracked_challenges']} | "
+            f"Leaders: {stats['current_leaders']} | "
+            f"Miners: {stats['miners_tracked']}"
         )
-
-    def _get_strategy_for_uid(self, uid: int) -> dict:
-        # TODO: Replace with real strategy retrieval
-        return {
-            "backbone": "physicsnemo_fno",
-            "challenge_id": self.active_challenges[uid % len(self.active_challenges)],
-            "epochs": 50,
-        }
 
 
 if __name__ == "__main__":
