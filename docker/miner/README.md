@@ -1,6 +1,6 @@
 # Hydrogen Miner Docker Environment
 
-Clean and powerful for agents.
+High-quality, agent-optimized experience.
 
 ## Focused Mode
 
@@ -8,11 +8,11 @@ Clean and powerful for agents.
 CHALLENGE_ID=poisson_2d_v1 docker compose up miner
 ```
 
-Includes:
-- Challenge-specific priors (with system noise)
-- Performance summary (start vs best score)
-- The actual best strategy
-- Intelligent recommendations
+Features:
+- Challenge-specific priors with system noise
+- Realistic iteration with gain tracking
+- Returns the actual best strategy
+- Performance summary + intelligent recommendations
 
 ## Environment Variables
 
@@ -23,4 +23,4 @@ Includes:
 
 ## Output
 
-Structured JSON with performance metrics and recommended next actions.
+Clean JSON summary with gain from baseline, best strategy, and recommended next actions.

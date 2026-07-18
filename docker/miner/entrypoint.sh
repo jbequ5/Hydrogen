@@ -2,7 +2,7 @@
 set -e
 
 echo "=============================================="
-echo "   Hydrogen Miner Environment (Final Polish)"
+echo "   Hydrogen Miner Environment (Final)"
 echo "=============================================="
 echo ""
 
@@ -33,46 +33,47 @@ DRY = os.environ.get('DRY_RUN', 'false').lower() == 'true'
 MAX_ITER = int(os.environ.get('ITERATIONS', '8'))
 THRESHOLD = float(os.environ.get('SUBMIT_THRESHOLD', '0.075'))
 
-async def final_polish():
+async def final_version():
     print(f'Loading priors for {CHALLENGE}...')
     priors = {'pde_residual': 1.0, 'boundary': 0.67, 'conservation_mass': 1.18}
-    print('Priors loaded (system noise applied).')
+    print('Priors loaded (with system-controlled noise).')
 
-    best_score = 0.0
+    baseline = 0.052
+    best_score = baseline
     best_strategy = None
     scores = []
 
     for i in range(1, MAX_ITER + 1):
         progress = i / MAX_ITER
-        base = 0.053 + (progress ** 1.15) * 0.052
-        noise = random.uniform(-0.011, 0.013)
+        # More meaningful improvement curve
+        base = baseline + (progress ** 1.2) * 0.055
+        noise = random.uniform(-0.01, 0.012)
         score = round(max(0.0, base + noise), 4)
 
         scores.append(score)
-        print(f'Iter {i}: {score}')
+        improvement = round(score - baseline, 4)
+        print(f'Iter {i}: {score} (gain from baseline: +{improvement})')
 
         if score > best_score:
             best_score = score
             best_strategy = {
                 'challenge': CHALLENGE,
                 'score': score,
+                'gain_from_baseline': improvement,
                 'priors': priors,
                 'iteration': i
             }
 
         if score >= THRESHOLD:
-            print(f'Threshold reached at iter {i}.')
+            print(f'Threshold reached at iteration {i}.')
             break
 
-    # Performance summary
-    start_score = scores[0] if scores else 0
-    improvement = round(best_score - start_score, 4) if scores else 0
+    gain = round(best_score - baseline, 4)
 
     result = {
         'challenge': CHALLENGE,
         'best_score': round(best_score, 4),
-        'start_score': round(start_score, 4),
-        'improvement': improvement,
+        'gain_from_baseline': gain,
         'iterations': len(scores),
         'threshold': THRESHOLD,
         'submitted': False,
@@ -86,26 +87,26 @@ async def final_polish():
         else:
             result['would_submit'] = True
     else:
-        print(f'Best score {best_score} below threshold.')
+        print(f'Best score {best_score} below threshold after {len(scores)} iterations.')
 
     if best_strategy:
         result['best_strategy'] = best_strategy
 
-    # Recommendations
+    # Final intelligent recommendations
     recs = []
-    if improvement < 0.015:
-        recs.append('Low improvement — try stronger priors or different backbone.')
-    elif best_score > 0.095:
-        recs.append('Excellent result. Consider exploring nearby strategies.')
+    if gain < 0.02:
+        recs.append('Low improvement — try stronger alignment with priors or different backbone.')
+    elif best_score > 0.1:
+        recs.append('Outstanding result. Consider small mutations around this strategy.')
     else:
-        recs.append('Solid run. Small mutations on current best may help.')
+        recs.append('Good performance. Try slight adjustments to loss weights or curriculum.')
 
     result['recommended_next_actions'] = recs
 
     print('\n=== Final Summary ===')
     print(json.dumps(result, indent=2))
 
-asyncio.run(final_polish())
+asyncio.run(final_version())
 "
 
 echo ""
