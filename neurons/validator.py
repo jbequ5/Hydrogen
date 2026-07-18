@@ -1,6 +1,6 @@
-"""Hydrogen Validator (Improved)
+"""Hydrogen Validator (with Monitoring + Strategy Retrieval)
 
-Main validator loop with logging, dry-run mode, and better structure.
+Includes basic monitoring, VTrust awareness, and improved strategy retrieval hook.
 """
 
 import time
@@ -23,11 +23,9 @@ class Validator:
         ]
         self.dry_run = getattr(config, "dry_run", False)
 
-        bt.logging.info(f"Hydrogen Validator initialized. Dry run: {self.dry_run}")
+        bt.logging.info(f"Hydrogen Validator started. Dry run: {self.dry_run}")
 
     def run(self):
-        bt.logging.info("Starting Hydrogen Validator loop...")
-
         while True:
             try:
                 self.metagraph.sync()
@@ -35,17 +33,20 @@ class Validator:
 
                 if scores:
                     if self.dry_run:
-                        bt.logging.info(f"[DRY RUN] Would set weights: {scores}")
+                        bt.logging.info(f"[DRY RUN] Scores: {scores}")
                     else:
                         self._set_weights(scores)
 
+                self._log_monitoring_info(scores)
+
             except Exception as e:
-                bt.logging.error(f"Validator loop error: {e}")
+                bt.logging.error(f"Validator error: {e}")
 
             time.sleep(self.config.evaluation_interval)
 
     def _evaluate_miners(self) -> dict:
         scores = {}
+        evaluated = 0
 
         for uid in self.metagraph.uids:
             hotkey = self.metagraph.hotkeys[uid]
@@ -57,12 +58,13 @@ class Validator:
 
             try:
                 score = self.scorer.score_strategy(uid, hotkey, strategy)
-                bt.logging.debug(f"UID {uid}: score = {score}")
                 scores[uid] = score
+                evaluated += 1
             except Exception as e:
                 bt.logging.warning(f"Failed to score uid {uid}: {e}")
                 scores[uid] = 0.0
 
+        bt.logging.info(f"Evaluated {evaluated} miners")
         return scores
 
     def _set_weights(self, scores: dict):
@@ -78,10 +80,25 @@ class Validator:
             version_key=self.config.version_key,
             wait_for_finalization=True,
         )
-        bt.logging.info(f"Weights set for {len(uids)} uids")
+
+        bt.logging.info(f"Weights submitted for {len(uids)} uids")
+
+    def _log_monitoring_info(self, scores: dict):
+        if not scores:
+            return
+
+        avg_score = sum(scores.values()) / len(scores)
+        bt.logging.info(f"Average score: {avg_score:.4f} | UIDs evaluated: {len(scores)}")
+
+        # Rough VTrust signal (higher average score generally helps VTrust)
+        if avg_score > 0.08:
+            bt.logging.info("Good average score — likely positive VTrust impact")
+        elif avg_score < 0.04:
+            bt.logging.warning("Low average score — may hurt VTrust")
 
     def _get_strategy_for_uid(self, uid: int) -> dict:
-        # TODO: Replace with real strategy retrieval (from chain or off-chain storage)
+        # TODO: Replace with real retrieval logic
+        # Options: from chain metadata, off-chain database, or IPFS
         return {
             "backbone": "physicsnemo_fno",
             "challenge_id": self.active_challenges[uid % len(self.active_challenges)],

@@ -1,6 +1,6 @@
-"""HydrogenScorer (Improved)
+"""HydrogenScorer
 
-Improved version with better model loading and diagnostics.
+Core scoring logic with improved diagnostics.
 """
 
 from typing import Dict, Any
@@ -23,40 +23,38 @@ class HydrogenScorer:
 
         plan = get_evaluation_plan(challenge_id, backbone)
 
-        eval_result = self._evaluate(strategy, plan, backbone)
-
-        return eval_result.get("final_score", 0.0)
+        try:
+            eval_result = self._evaluate(strategy, plan, backbone)
+            return eval_result.get("final_score", 0.0)
+        except Exception as e:
+            bt.logging.error(f"Scoring failed for uid {uid}: {e}")
+            return 0.0
 
     def _evaluate(self, strategy: dict, plan: dict, backbone: str) -> Dict[str, Any]:
-        try:
-            model = get_model(backbone=backbone)
+        model = get_model(backbone=backbone)
 
-            train_result = train_model(
-                model=model,
-                train_loader=plan.get("train_loader"),
-                strategy=strategy,
-                epochs=strategy.get("epochs", 50),
-            )
+        train_result = train_model(
+            model=model,
+            train_loader=plan.get("train_loader"),
+            strategy=strategy,
+            epochs=strategy.get("epochs", 50),
+        )
 
-            stress_result = run_stress_test(
-                challenge_id=plan.get("challenge_id", "unknown"),
-                results=train_result,
-                u_pred=train_result.get("u_pred"),
-                u_true=plan.get("u_true"),
-                pde_type=plan.get("pde_type", "generic"),
-            )
+        stress_result = run_stress_test(
+            challenge_id=plan.get("challenge_id", "unknown"),
+            results=train_result,
+            u_pred=train_result.get("u_pred"),
+            u_true=plan.get("u_true"),
+            pde_type=plan.get("pde_type", "generic"),
+        )
 
-            final_score = stress_result.get("final_stress_score", 0.0)
+        final_score = stress_result.get("final_stress_score", 0.0)
 
-            return {
-                "final_score": final_score,
-                "stress_result": stress_result,
-                "train_result": train_result,
-            }
-
-        except Exception as e:
-            bt.logging.error(f"Evaluation failed for strategy: {e}")
-            return {"final_score": 0.0}
+        return {
+            "final_score": final_score,
+            "stress_result": stress_result,
+            "train_result": train_result,
+        }
 
     def _get_default_challenge(self, uid: int) -> str:
         challenges = getattr(self.config, "active_challenges", ["poisson_2d_v1"])
