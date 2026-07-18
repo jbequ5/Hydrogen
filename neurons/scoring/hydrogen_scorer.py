@@ -1,8 +1,11 @@
-"""HydrogenScorer with Multi-Objective Scoring
+"""HydrogenScorer with 3 High-Level Objectives
 
-Computes multiple fine-grained metrics internally.
-Collapses them into high-level objectives for scoring.
-Exports rich data for the Landscape Agent.
+Fine-grained metrics collapsed into:
+- Physics Fidelity
+- Robustness
+- Accuracy
+
+Rich data exported for Landscape Agent.
 """
 
 from typing import Dict, Any
@@ -19,9 +22,10 @@ class HydrogenScorer:
     def __init__(self, config: bt.config):
         self.config = config
 
-        # Configurable high-level objective weights
-        self.stress_weight = getattr(config, "stress_weight", 0.75)
-        self.benchmark_weight = getattr(config, "benchmark_weight", 0.25)
+        # Configurable weights for the 3 high-level objectives
+        self.physics_weight = getattr(config, "physics_weight", 0.5)
+        self.robustness_weight = getattr(config, "robustness_weight", 0.3)
+        self.accuracy_weight = getattr(config, "accuracy_weight", 0.2)
 
     def score_strategy(self, uid: int, hotkey: str, strategy: dict) -> float:
         challenge_id = strategy.get("challenge_id") or self._get_default_challenge(uid)
@@ -32,21 +36,20 @@ class HydrogenScorer:
         try:
             eval_result = self._evaluate(strategy, plan, backbone)
 
-            # Use high-level objectives for final score
-            high_level = eval_result["high_level_objectives"]
+            high = eval_result["high_level_objectives"]
             final_score = (
-                self.stress_weight * high_level["stress_physics"] +
-                self.benchmark_weight * high_level["benchmark_accuracy"]
+                self.physics_weight * high["physics_fidelity"] +
+                self.robustness_weight * high["robustness"] +
+                self.accuracy_weight * high["accuracy"]
             )
 
-            # Attach rich data for Landscape Agent
             eval_result["landscape_data"] = {
                 "uid": uid,
                 "hotkey": hotkey,
                 "challenge_id": challenge_id,
                 "backbone": backbone,
                 "fine_grained_scores": eval_result["fine_grained_scores"],
-                "high_level_objectives": high_level,
+                "high_level_objectives": high,
                 "strategy": strategy,
             }
 
@@ -59,7 +62,6 @@ class HydrogenScorer:
     def _evaluate(self, strategy: dict, plan: dict, backbone: str) -> Dict[str, Any]:
         model = get_model(backbone=backbone)
 
-        # === Training ===
         train_result = train_model(
             model=model,
             train_loader=plan.get("train_loader"),
@@ -67,7 +69,6 @@ class HydrogenScorer:
             epochs=strategy.get("epochs", 50),
         )
 
-        # === Stress + Physics ===
         stress_result = run_stress_test(
             challenge_id=plan.get("challenge_id", "unknown"),
             results=train_result,
@@ -76,59 +77,51 @@ class HydrogenScorer:
             pde_type=plan.get("pde_type", "generic"),
         )
 
-        stress_physics_score = stress_result.get("final_stress_score", 0.0)
-
-        # === Benchmark Accuracy ===
-        benchmark_score = self._compute_benchmark_score(train_result, plan)
-
-        # === Fine-grained scores (for Landscape) ===
+        # === Fine-grained scores ===
         fine_grained = {
             "benchmark_mse": self._safe_get(train_result, "benchmark_mse", 0.0),
             "physics_residual": stress_result.get("physics_residual", 0.0),
+            "divergence_error": stress_result.get("divergence_error", 0.0),
+            "energy_stability": stress_result.get("energy_stability", 0.0),
             "long_term_stability": stress_result.get("long_term_stability", 0.0),
             "stress_generalization": stress_result.get("stress_generalization", 0.0),
+            "boundary_violation": stress_result.get("boundary_violation", 0.0),
         }
 
-        # === High-level objectives (for scoring / Pareto) ===
+        # === High-level objectives (3) ===
+        physics_fidelity = self._compute_physics_fidelity(fine_grained)
+        robustness = self._compute_robustness(fine_grained)
+        accuracy = self._compute_accuracy(fine_grained)
+
         high_level = {
-            "stress_physics": stress_physics_score,
-            "benchmark_accuracy": benchmark_score,
-            # Future: add "efficiency", "uncertainty_quality", etc.
+            "physics_fidelity": physics_fidelity,
+            "robustness": robustness,
+            "accuracy": accuracy,
         }
 
         return {
-            "final_score": 0.0,  # Will be overwritten in score_strategy
+            "final_score": 0.0,
             "fine_grained_scores": fine_grained,
             "high_level_objectives": high_level,
             "stress_result": stress_result,
             "train_result": train_result,
         }
 
-    def _compute_benchmark_score(self, train_result: dict, plan: dict) -> float:
-        try:
-            benchmark_loader = plan.get("benchmark_loader")
-            if not benchmark_loader:
-                return 0.5
+    def _compute_physics_fidelity(self, fine: dict) -> float:
+        # Combine physics-related fine-grained metrics
+        residual = 1.0 - min(1.0, fine.get("physics_residual", 0.5))
+        divergence = 1.0 - min(1.0, fine.get("divergence_error", 0.5))
+        energy = fine.get("energy_stability", 0.5)
+        boundary = 1.0 - min(1.0, fine.get("boundary_violation", 0.5))
+        return (residual + divergence + energy + boundary) / 4.0
 
-            model = train_result.get("model")
-            if model is None:
-                return 0.0
+    def _compute_robustness(self, fine: dict) -> float:
+        stability = fine.get("long_term_stability", 0.5)
+        generalization = fine.get("stress_generalization", 0.5)
+        return (stability + generalization) / 2.0
 
-            total_error = 0.0
-            count = 0
-            for batch in benchmark_loader:
-                x, y = batch[0], batch[1]
-                with bt.no_grad():
-                    pred = model(x)
-                    error = bt.nn.functional.mse_loss(pred, y).item()
-                    total_error += error
-                    count += 1
-
-            avg_error = total_error / max(count, 1)
-            return max(0.0, 1.0 - avg_error * 5)
-
-        except Exception:
-            return 0.5
+    def _compute_accuracy(self, fine: dict) -> float:
+        return max(0.0, 1.0 - fine.get("benchmark_mse", 0.5) * 5)
 
     def _safe_get(self, d: dict, key: str, default=0.0):
         return d.get(key, default) if isinstance(d, dict) else default
