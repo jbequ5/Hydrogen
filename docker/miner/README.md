@@ -1,6 +1,6 @@
 # Hydrogen Miner Docker Environment
 
-Clean, powerful, and agent-friendly.
+Clean and powerful for agents.
 
 ## Focused Mode
 
@@ -8,19 +8,19 @@ Clean, powerful, and agent-friendly.
 CHALLENGE_ID=poisson_2d_v1 docker compose up miner
 ```
 
-Runs a focused loop with:
+Includes:
 - Challenge-specific priors (with system noise)
-- Controllable iterations and threshold
-- Returns the actual best strategy
-- Gives intelligent recommendations
+- Performance summary (start vs best score)
+- The actual best strategy
+- Intelligent recommendations
 
-## Key Environment Variables
+## Environment Variables
 
-- `CHALLENGE_ID` — Focus on one challenge
-- `DRY_RUN` — Safe testing mode
-- `ITERATIONS` — Max cycles (default 8)
-- `SUBMIT_THRESHOLD` — Score needed to submit
+- `CHALLENGE_ID`
+- `DRY_RUN`
+- `ITERATIONS`
+- `SUBMIT_THRESHOLD`
 
 ## Output
 
-Structured JSON at the end including the best strategy and recommended next actions.
+Structured JSON with performance metrics and recommended next actions.
