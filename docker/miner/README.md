@@ -1,64 +1,68 @@
 # Hydrogen Miner Docker Environment
 
-This provides a clean, user-friendly way to run miners and agentic miners.
+This provides a clean, intelligent way to run both example and custom agentic miners.
 
 ## Quick Start
 
 ```bash
-# 1. Copy the example env file
+# Copy example config
 cp docker/miner/.env.example .env
 
-# 2. Edit .env with your hotkey
+# Edit .env with your details
 nano .env
 
-# 3. Run the miner
-cd ..
+# Run (defaults to multi-challenge mode)
 docker compose up miner
 ```
 
-## Available Modes
+## Focused Mode (Recommended for Most Users)
 
-| Mode                        | Command                                      | Description |
-|-----------------------------|----------------------------------------------|-------------|
-| Default agentic miner       | `python examples/run_agentic_miner.py`       | Runs the built-in example loop |
-| MCP-style tool server       | `python -m hydrogen.miner.mcp_server`        | Exposes tools for LLM agents |
-| Custom agent                | `python your_agent.py`                       | Run your own script |
-| Interactive shell           | `bash`                                       | Explore inside the container |
+You can focus on **one specific challenge** by setting `CHALLENGE_ID`:
+
+```bash
+CHALLENGE_ID=poisson_2d_v1 docker compose up miner
+```
+
+In focused mode the container will:
+- Load challenge-specific priors from the Landscape
+- Run an internal testing/iteration loop
+- Only submit when the estimated score looks good
+
+This is the recommended way to work on one challenge deeply.
+
+## Multi-Challenge Mode
+
+If you don't set `CHALLENGE_ID`, it runs the built-in example that iterates over all active challenges.
+
+```bash
+docker compose up miner
+```
 
 ## Configuration
 
-You can configure via:
+Set these in your `.env` file or as environment variables:
 
-- Environment variables (recommended)
-- `.env` file (copied from `.env.example`)
-
-Key variables:
-
-- `HYDROGEN_HOTKEY` — Your Bittensor hotkey
-- `HYDROGEN_WALLET` — Wallet name
-- `HYDROGEN_API_KEY` — Optional key for MCP server
+```bash
+HYDROGEN_HOTKEY=5F...          # Your hotkey
+HYDROGEN_WALLET=default        # Wallet name
+HYDROGEN_API_KEY=secret        # Optional (for MCP server)
+CHALLENGE_ID=poisson_2d_v1     # Optional: focus on one challenge
+```
 
 ## Running Custom Agents
 
 ```bash
-# Mount and run your script
-docker compose run miner python /app/my_agent.py
-
-# Or with a volume
- docker run -v $(pwd)/my_agent.py:/app/my_agent.py hydrogen-miner python my_agent.py
+docker compose run miner python my_custom_agent.py
 ```
 
-## Tips for Best Experience
-
-- Always start strategies from `get_priors` when possible
-- Use `validate_strategy` before submitting
-- Check `STRATEGY.md` for guidance on writing good strategies
-- The container is pre-configured with the full SDK and `AgenticMiner`
-
-## Advanced
-
-You can also start the container with a custom command:
+Or mount a local file:
 
 ```bash
-docker compose run miner bash
+docker run -v $(pwd)/my_agent.py:/app/my_agent.py hydrogen-miner python my_agent.py
 ```
+
+## Tips
+
+- Always start from priors when possible (`get_priors`)
+- Use local validation aggressively before submitting
+- See `STRATEGY.md` for strategy writing guidance

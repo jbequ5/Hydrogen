@@ -24,15 +24,7 @@ services:
       - HYDROGEN_HOTKEY=${HYDROGEN_HOTKEY:-}
       - HYDROGEN_WALLET=${HYDROGEN_WALLET:-}
       - HYDROGEN_API_KEY=${HYDROGEN_API_KEY:-}
-    # Default: Run the example agentic miner
+      - CHALLENGE_ID=${CHALLENGE_ID:-}
+    # Default: multi-challenge mode
+    # Set CHALLENGE_ID to run focused mode on one challenge
     command: python examples/run_agentic_miner.py
-
-  # Example: Run a completely custom agent
-  # custom-agent:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/miner/Dockerfile
-  #   volumes:
-  #     - .:/app
-  #     - ./my_custom_agent.py:/app/my_custom_agent.py
-  #   command: python my_custom_agent.py
