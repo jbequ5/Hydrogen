@@ -1,14 +1,6 @@
-"""HydrogenScorer with 3 High-Level Objectives + Pareto Front Computation
+"""HydrogenScorer updated to return combined_score for ChallengeWinnerTracker."""
 
-Objectives (default 45/30/25):
-- Physics Fidelity : 45%
-- Robustness       : 30%
-- Accuracy         : 25%
-
-Includes Pareto front computation over the 3 objectives.
-"""
-
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 import bittensor as bt
 
@@ -27,7 +19,7 @@ class HydrogenScorer:
         self.robustness_weight = getattr(config, "robustness_weight", 0.30)
         self.accuracy_weight = getattr(config, "accuracy_weight", 0.25)
 
-    def score_strategy(self, uid: int, hotkey: str, strategy: dict) -> float:
+    def score_strategy(self, uid: int, hotkey: str, strategy: dict) -> Dict[str, Any]:
         challenge_id = strategy.get("challenge_id") or self._get_default_challenge(uid)
         backbone = strategy.get("backbone", "physicsnemo_fno")
 
@@ -37,12 +29,13 @@ class HydrogenScorer:
             eval_result = self._evaluate(strategy, plan, backbone)
 
             high = eval_result["high_level_objectives"]
-            final_score = (
+            combined_score = (
                 self.physics_weight * high["physics_fidelity"] +
                 self.robustness_weight * high["robustness"] +
                 self.accuracy_weight * high["accuracy"]
             )
 
+            eval_result["combined_score"] = combined_score
             eval_result["landscape_data"] = {
                 "uid": uid,
                 "hotkey": hotkey,
@@ -50,14 +43,15 @@ class HydrogenScorer:
                 "backbone": backbone,
                 "fine_grained_scores": eval_result["fine_grained_scores"],
                 "high_level_objectives": high,
+                "combined_score": combined_score,
                 "strategy": strategy,
             }
 
-            return final_score
+            return eval_result
 
         except Exception as e:
             bt.logging.error(f"Scoring failed for uid {uid}: {e}")
-            return 0.0
+            return {"combined_score": 0.0}
 
     def _evaluate(self, strategy: dict, plan: dict, backbone: str) -> Dict[str, Any]:
         model = get_model(backbone=backbone)
@@ -103,43 +97,11 @@ class HydrogenScorer:
         }
 
         return {
-            "final_score": 0.0,
             "fine_grained_scores": fine_grained,
             "high_level_objectives": high_level,
             "stress_result": stress_result,
             "train_result": train_result,
         }
-
-    def compute_pareto_front(self, candidates: List[Dict[str, float]]) -> List[Dict[str, float]]:
-        """
-        Compute the Pareto front over the 3 high-level objectives.
-
-        Each candidate should be a dict with keys:
-            'physics_fidelity', 'robustness', 'accuracy'
-
-        Returns the list of non-dominated candidates.
-
-        A candidate A dominates B if A is better than or equal to B in all objectives
-        and strictly better in at least one.
-        """
-        pareto = []
-        for i, c1 in enumerate(candidates):
-            dominated = False
-            for j, c2 in enumerate(candidates):
-                if i == j:
-                    continue
-                if (c2["physics_fidelity"] >= c1["physics_fidelity"] and
-                    c2["robustness"] >= c1["robustness"] and
-                    c2["accuracy"] >= c1["accuracy"] and
-                    (c2["physics_fidelity"] > c1["physics_fidelity"] or
-                     c2["robustness"] > c1["robustness"] or
-                     c2["accuracy"] > c1["accuracy"])):
-                    dominated = True
-                    break
-            if not dominated:
-                pareto.append(c1)
-
-        return pareto
 
     def _compute_physics_fidelity(self, fine: dict) -> float:
         residual = 1.0 - min(1.0, fine.get("physics_residual", 0.5))
