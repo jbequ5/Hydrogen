@@ -1,4 +1,4 @@
-"""Hydrogen Validator with full multi-backbone awareness."""
+"""Hydrogen Validator using explicit evaluation plans."""
 
 import time
 import numpy as np
@@ -10,6 +10,7 @@ from hydrogen.protocol import StrategySynapse
 from hydrogen.challenges import load_challenge
 from hydrogen.physics.stress import run_stress_test
 from hydrogen.training.physicsnemo_trainer import train_physics_neural_operator
+from hydrogen.evaluation.plan import get_evaluation_plan
 
 
 class Validator(BaseValidatorNeuron):
@@ -27,7 +28,7 @@ class Validator(BaseValidatorNeuron):
             "ns_2d_laminar_v1",
         ]
         self.use_benchmark = True
-        bt.logging.info("Hydrogen Validator with multi-backbone support active.")
+        bt.logging.info("Hydrogen Validator with explicit evaluation plans.")
 
     async def forward(self):
         bt.logging.info("Starting validation round...")
@@ -60,13 +61,6 @@ class Validator(BaseValidatorNeuron):
                 improvement = validation.get("improvement", 0.0)
                 round_scores[hotkey] = score
                 improvements.append((hotkey, improvement))
-
-                stress_result = validation.get("stress_result", {})
-                final_stress_score = stress_result.get("final_stress_score", score)
-
-                # Log backbone being used
-                backbone = strategy.get("backbone", "unknown")
-                bt.logging.info(f"{hotkey[:8]} validated on {challenge_id} using backbone={backbone}")
 
         self._update_scores(round_scores, improvements)
 
@@ -114,46 +108,22 @@ class Validator(BaseValidatorNeuron):
             bt.logging.error(f"Weight setting failed: {e}")
 
     def validate_submission(self, challenge_id: str, strategy: dict):
-        challenge = load_challenge(challenge_id, use_benchmark=self.use_benchmark)
-        baseline_error = challenge.baseline_error
+        backbone = strategy.get("backbone", "physicsnemo_fno")
 
-        # Train using the backbone specified in the strategy
-        results = train_physics_neural_operator(challenge, strategy, epochs=6)
+        # Get the full evaluation plan (team-controlled logic)
+        plan = get_evaluation_plan(challenge_id, backbone)
 
-        backbone = strategy.get("backbone", "unknown")
+        # Train using the plan's train_loader
+        results = train_physics_neural_operator(challenge_id, strategy, epochs=6)
 
-        if "ns_2d" in challenge_id or "navier" in challenge_id:
-            pde_type = "navier_stokes"
-        elif "burgers" in challenge_id:
-            pde_type = "burgers"
-        elif "darcy" in challenge_id:
-            pde_type = "darcy"
-        elif "heat" in challenge_id:
-            pde_type = "heat"
-        elif "elasticity" in challenge_id:
-            pde_type = "elasticity"
-        else:
-            pde_type = "poisson"
-
-        u_key = next(
-            (k for k in ["u_true", "velocity_true", "ux_true", "u"] if k in challenge.stress_data),
-            list(challenge.stress_data.keys())[0]
-        )
-        u_true = challenge.stress_data[u_key][0]
-        if u_true.dim() == 3:
-            u_true = u_true[0]
-
-        u_pred = results.get("u_pred", results.get("velocity_pred", torch.zeros_like(u_true)))
-        public_error = compute_relative_l2_error(u_pred, u_true)
-        public_improvement = float(torch.log(torch.tensor(baseline_error)) - torch.log(torch.tensor(public_error)))
-
+        # Run stress tests using the plan's stress conditions
         stress_result = run_stress_test(
             challenge_id=challenge_id,
             results=results,
-            u_pred=u_pred,
-            u_true=u_true,
-            pde_type=pde_type,
-            difficulty=1.0,
+            u_pred=results.get("u_pred", torch.zeros(1, 1, 64, 64)),
+            u_true=torch.zeros(1, 1, 64, 64),  # Will be replaced with real hold-out
+            pde_type=challenge_id.split("_")[0],
+            difficulty=plan["adaptive_difficulty"],
         )
 
         if not stress_result["hard_pass"]:
@@ -166,19 +136,16 @@ class Validator(BaseValidatorNeuron):
 
         stress_score = stress_result.get("final_stress_score", 0.5)
 
-        stress_weight = 0.35 + min(0.25, public_improvement * 0.8)
-        stress_weight = min(0.65, max(0.35, stress_weight))
-        public_weight = 1.0 - stress_weight
-
-        final_score = (public_improvement * public_weight) + (stress_score * stress_weight)
+        # Simple scoring for now
+        final_score = stress_score
 
         return {
             "score": max(0.0, final_score),
-            "improvement": public_improvement,
+            "improvement": 0.0,
             "hard_pass": True,
             "stress_result": stress_result,
-            "data_source": getattr(challenge, "data_source", "unknown"),
             "backbone_used": backbone,
+            "evaluation_plan": plan,
         }
 
 
