@@ -1,4 +1,4 @@
-"""Training function with real model output and validation support."""
+"""Training entrypoint that fully respects miner strategy."""
 
 from typing import Dict, Any
 
@@ -18,21 +18,20 @@ def train_physics_neural_operator(
     model = get_model(backbone=backbone, in_channels=3, out_channels=1)
 
     challenge_id = getattr(challenge, "challenge_id", "unknown")
-    train_loader = get_benchmark_loader(challenge_id, batch_size=8, split="train")
+    train_loader = get_benchmark_loader(challenge_id, batch_size=strategy.get("batch_size", 8), split="train")
 
     result = train_model(
         model=model,
         train_loader=train_loader,
-        epochs=epochs,
-        lr=strategy.get("learning_rate", 0.001),
+        strategy=strategy,          # Pass full strategy for optimizer, scheduler, AMP, clipping, etc.
+        epochs=strategy.get("epochs", epochs),
     )
 
     trained_model = result["model"]
 
-    # Generate real u_pred from the trained model
+    # Generate real prediction from trained model
     model.eval()
     with torch.no_grad():
-        # Take first batch from train_loader as example input
         try:
             sample_x, _ = next(iter(train_loader))
             u_pred = trained_model(sample_x[:1].to(next(trained_model.parameters()).device))
