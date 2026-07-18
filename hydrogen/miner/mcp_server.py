@@ -1,6 +1,6 @@
-"""MCP-style Server with robust persistent sessions.
+"""MCP-style Server with Redis-backed sessions (with file fallback).
 
-Sessions are stored on disk and consistently updated across all tool calls.
+Sessions are now stored in Redis when available, with file-based fallback.
 """
 
 import os
@@ -9,6 +9,11 @@ import time
 import uuid
 
 import asyncio
+try:
+    import redis.asyncio as aioredis
+except ImportError:
+    aioredis = None
+
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import StreamingResponse
 
@@ -18,52 +23,63 @@ from hydrogen.miner.client import MockHydrogenClient
 
 app = FastAPI(
     title="Hydrogen Mining MCP Server",
-    description="MCP-style server with robust persistent sessions.",
-    version="0.8.0",
+    description="MCP-style server with Redis-backed persistent sessions.",
+    version="0.9.0",
 )
 
 # ============================================================
-# Persistent Session Storage
+# Redis / File Session Backend
 # ============================================================
 
-SESSION_DIR = "./sessions"
-os.makedirs(SESSION_DIR, exist_ok=True)
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 SESSION_TTL_SECONDS = 86400  # 24 hours
+
+redis_client = None
+
+if aioredis:
+    try:
+        redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
+    except Exception:
+        redis_client = None
+
+SESSION_DIR = "./sessions"
+if not redis_client:
+    os.makedirs(SESSION_DIR, exist_ok=True)
 
 
 def _get_session_path(session_id: str) -> str:
     return os.path.join(SESSION_DIR, f"{session_id}.json")
 
 
-def _load_session(session_id: str) -> dict:
-    path = _get_session_path(session_id)
-    if not os.path.exists(path):
-        return None
-    try:
-        with open(path, "r") as f:
-            data = json.load(f)
-        # Expiration check
-        if time.time() - data.get("last_accessed", 0) > SESSION_TTL_SECONDS:
-            os.remove(path)
+async def _load_session(session_id: str) -> dict:
+    if redis_client:
+        data = await redis_client.get(f"session:{session_id}")
+        return json.loads(data) if data else None
+    else:
+        path = _get_session_path(session_id)
+        if not os.path.exists(path):
             return None
-        return data
-    except Exception:
-        return None
+        with open(path, "r") as f:
+            return json.load(f)
 
 
-def _save_session(session_id: str, data: dict):
+async def _save_session(session_id: str, data: dict):
     data["last_accessed"] = time.time()
-    path = _get_session_path(session_id)
-    try:
+    if redis_client:
+        await redis_client.setex(
+            f"session:{session_id}",
+            SESSION_TTL_SECONDS,
+            json.dumps(data)
+        )
+    else:
+        path = _get_session_path(session_id)
         with open(path, "w") as f:
             json.dump(data, f, indent=2)
-    except Exception as e:
-        print(f"Failed to save session {session_id}: {e}")
 
 
-def get_or_create_session(session_id: str = None) -> tuple[str, dict]:
+async def get_or_create_session(session_id: str = None) -> tuple[str, dict]:
     if session_id:
-        existing = _load_session(session_id)
+        existing = await _load_session(session_id)
         if existing:
             return session_id, existing
 
@@ -76,12 +92,12 @@ def get_or_create_session(session_id: str = None) -> tuple[str, dict]:
         "history": [],
         "metadata": {},
     }
-    _save_session(new_id, new_data)
+    await _save_session(new_id, new_data)
     return new_id, new_data
 
 
 # ============================================================
-# Client & Miner
+# Client
 # ============================================================
 
 client = MockHydrogenClient()
@@ -96,34 +112,35 @@ def verify_api_key(x_api_key: str = Header(None)):
 
 
 # ============================================================
-# Health Check
+# Health
 # ============================================================
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    backend = "redis" if redis_client else "file"
+    return {"status": "ok", "session_backend": backend}
 
 
 # ============================================================
-# Session Endpoints
+# Sessions
 # ============================================================
 
 @app.post("/sessions/create")
 async def create_session(auth: bool = Depends(verify_api_key)):
-    session_id, _ = get_or_create_session()
+    session_id, _ = await get_or_create_session()
     return {"session_id": session_id}
 
 
 @app.get("/sessions/{session_id}")
 async def get_session(session_id: str, auth: bool = Depends(verify_api_key)):
-    data = _load_session(session_id)
+    data = await _load_session(session_id)
     if not data:
         raise HTTPException(status_code=404, detail="Session not found or expired")
     return data
 
 
 # ============================================================
-# Tool Endpoints with Consistent Session Persistence
+# Tool Endpoints
 # ============================================================
 
 @app.get("/tools/list_challenges")
@@ -136,9 +153,9 @@ async def get_priors(payload: dict, auth: bool = Depends(verify_api_key)):
     challenge_id = payload.get("challenge_id")
     session_id = payload.get("session_id")
 
-    sid, data = get_or_create_session(session_id)
+    sid, data = await get_or_create_session(session_id)
     data["challenge_id"] = challenge_id
-    _save_session(sid, data)
+    await _save_session(sid, data)
 
     return await miner.get_priors(challenge_id)
 
@@ -151,9 +168,9 @@ async def propose_strategy(payload: dict, auth: bool = Depends(verify_api_key)):
 
     strategy = await miner.propose_strategy(challenge_id, base_strategy=base)
 
-    sid, data = get_or_create_session(session_id)
+    sid, data = await get_or_create_session(session_id)
     data["best_strategy"] = strategy
-    _save_session(sid, data)
+    await _save_session(sid, data)
 
     return strategy
 
@@ -167,9 +184,9 @@ async def validate_strategy(payload: dict, auth: bool = Depends(verify_api_key))
 
     result = await miner.validate_locally(strategy, challenge_id, quick=quick)
 
-    sid, data = get_or_create_session(session_id)
+    sid, data = await get_or_create_session(session_id)
     data["history"].append({"action": "validate", "result": result})
-    _save_session(sid, data)
+    await _save_session(sid, data)
 
     return result
 
@@ -182,15 +199,15 @@ async def submit_strategy(payload: dict, auth: bool = Depends(verify_api_key)):
 
     result = await miner.submit(strategy, challenge_id)
 
-    sid, data = get_or_create_session(session_id)
+    sid, data = await get_or_create_session(session_id)
     data["history"].append({"action": "submit", "result": result})
-    _save_session(sid, data)
+    await _save_session(sid, data)
 
     return result
 
 
 # ============================================================
-# Streaming with Retry
+# Streaming
 # ============================================================
 
 @app.post("/tools/stream_validation")
@@ -212,9 +229,9 @@ async def stream_validation(payload: dict, auth: bool = Depends(verify_api_key))
         result = await miner.validate_locally(strategy, challenge_id)
 
         if session_id:
-            sid, data = get_or_create_session(session_id)
+            sid, data = await get_or_create_session(session_id)
             data["history"].append({"action": "stream_validate", "result": result})
-            _save_session(sid, data)
+            await _save_session(sid, data)
 
         yield f"data: {json.dumps(result)}\n\n"
 
