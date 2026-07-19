@@ -1,7 +1,7 @@
 # Determinism Design Specification
 
 **Document:** `docs/DETERMINISM_DESIGN.md`
-**Version:** 1.0
+**Version:** 1.1
 **Date:** July 2026
 **Focus:** Full determinism guarantees across the Hydrogen evaluation pipeline
 
@@ -123,35 +123,79 @@ Note: `use_deterministic_algorithms(True)` can reduce performance. This is accep
 
 ---
 
-## 7. Reproducibility Harness
+## 7. External Library & System Determinism (Gap Fill)
 
-We will implement a `ReproducibilityHarness` that can:
+### 7.1 NumPy / SciPy
 
-1. Run a full evaluation twice with the same inputs.
-2. Compare all intermediate and final outputs (scores, stress results, gate outcomes).
-3. Report any non-determinism with high precision.
+```python
+import numpy as np
 
-This harness will be used both during development and for validator audits.
+np.random.seed(sub_seed)
+```
+
+All NumPy random operations must be explicitly seeded from the hierarchy.
+
+### 7.2 Custom CUDA Kernels (Future)
+
+Any custom CUDA kernels must be compiled with deterministic flags and avoid atomic operations where possible. Their behavior must be validated in the Reproducibility Harness.
+
+### 7.3 Future preCICE / External Solver Determinism
+
+preCICE and coupled solvers introduce significant non-determinism risks (communication order, floating-point reductions, solver internal randomness). For Phase 2+ we will:
+
+- Pin solver versions and random seeds inside each specialist container.
+- Record all solver configuration in the evaluation provenance.
+- Accept small floating-point tolerance in cross-validator audits for coupled runs.
+
+### 7.4 Floating-Point Tolerance Strategy
+
+For audit purposes we define two tiers:
+
+- **Bit-level reproducibility** (same validator, same hardware): Must be exact.
+- **Cross-validator audit** (different hardware): Accept small tolerance (e.g., `1e-6` relative) on final scores only. All intermediate tensors should still match within tolerance.
+
+Tolerance values and comparison logic will be implemented in the Reproducibility Harness.
 
 ---
 
-## 8. Environment & Container Pinning
+## 8. Environment & Full Provenance (Gap Fill)
 
-For true cross-validator reproducibility:
+Every evaluation run must record:
 
-- Use pinned Docker images with exact CUDA + cuDNN versions.
-- Record full environment (Python, library versions) in every evaluation run.
-- Consider using `conda-lock` or `pip freeze` + image digest for full provenance.
+- Docker image digest
+- Python version + exact package versions (`pip freeze` or `conda list`)
+- CUDA driver + runtime version
+- cuDNN version
+- Host OS + architecture
+- Git commit hash of the validator code
+
+This information is stored alongside the evaluation result and can be used during audits to detect environment-induced non-determinism.
 
 ---
 
-## 9. Integration with Stress Testing
+## 9. Reproducibility Harness (Detailed Design)
+
+The `ReproducibilityHarness` will:
+
+1. Run a submission twice (or across two validators).
+2. Compare:
+   - Final scores and gate outcomes
+   - Stress evaluation results
+   - Intermediate tensor statistics (mean, std, max) for key layers
+3. Report any deviation above defined tolerance.
+4. Log full environment provenance.
+
+This harness will be used both in development CI and for validator-to-validator audits.
+
+---
+
+## 10. Integration with Stress Testing
 
 The stress generation system (see `docs/STRESS_TEST_DESIGN.md`) must use the same master seed hierarchy. This ensures that stress conditions themselves are deterministic and auditable.
 
 ---
 
-## 10. Success Criteria
+## 11. Success Criteria
 
 | Criterion | Target |
 |-----------|--------|
@@ -160,10 +204,11 @@ The stress generation system (see `docs/STRESS_TEST_DESIGN.md`) must use the sam
 | Full pipeline reproducibility test passes | Yes |
 | All random operations derive from challenge-specific seed | Yes |
 | Environment is fully recorded per evaluation | Yes |
+| Floating-point tolerance policy defined and implemented | Yes |
 
 ---
 
-## 11. Phased Rollout
+## 12. Phased Rollout
 
 | Phase | Scope | Notes |
 |-------|-------|-------|
@@ -173,14 +218,15 @@ The stress generation system (see `docs/STRESS_TEST_DESIGN.md`) must use the sam
 
 ---
 
-## 12. Summary
+## 13. Summary
 
-This design adopts modern best practices from reproducible scientific machine learning:
+This updated design closes the major practical gaps:
 
-- Hierarchical challenge-bound seeding
-- Framework-level determinism flags (PyTorch/JAX)
-- Explicit reproducibility harness
-- Environment pinning and provenance
+- External library control
+- Floating-point tolerance strategy
+- Full environment provenance
+- Concrete Reproducibility Harness
+- Future preCICE considerations
 
 Combined with the stress test design, this gives Hydrogen one of the strongest determinism and auditability guarantees among decentralized evaluation systems.
 
