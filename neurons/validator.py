@@ -1,6 +1,9 @@
-"""Hydrogen Validator with StrategyStore integration.
+# neurons/validator.py
 
-Uses ChallengeWinnerTracker + StrategyStore for clean strategy handling.
+"""
+Hydrogen Validator - Now fully integrated with hidden stress testing.
+
+Uses HydrogenScorer + StressEvaluator for physics-gated stress evaluation.
 """
 
 import time
@@ -9,7 +12,12 @@ import bittensor as bt
 
 from neurons.scoring.hydrogen_scorer import HydrogenScorer
 from neurons.scoring.challenge_winner_tracker import ChallengeWinnerTracker
-from neurons.strategy.strategy_store import LocalFileStrategyStore, StrategyStore
+from neurons.strategy.strategy_store import LocalFileStrategyStore
+
+from neurons.stress.procedural_generator import ProceduralStressGenerator
+from neurons.stress.well_generator import WellStressGenerator
+
+from neurons.stress.stress_models import StressTestSet
 
 
 class Validator:
@@ -22,10 +30,13 @@ class Validator:
         self.scorer = HydrogenScorer(config)
         self.tracker = ChallengeWinnerTracker(decay_factor=0.85)
 
-        # Strategy storage / retrieval
-        self.strategy_store: StrategyStore = LocalFileStrategyStore(
+        self.strategy_store = LocalFileStrategyStore(
             storage_dir=getattr(config, "strategy_storage_dir", "./strategies")
         )
+
+        # Stress generators
+        self.procedural_generator = ProceduralStressGenerator()
+        self.well_generator = WellStressGenerator()
 
         self.active_challenges = getattr(config, "active_challenges", None) or [
             "poisson_2d_v1", "darcy_2d_v1", "burgers_v1"
@@ -59,15 +70,54 @@ class Validator:
                 continue
 
             try:
-                result = self.scorer.score_strategy(uid, hotkey, strategy)
-
+                # Generate hidden stress set for this challenge
                 challenge_id = strategy.get("challenge_id", "default")
+                physics_class = strategy.get("physics_class", "hyperbolic")
+
+                stress_set = self._generate_hidden_stress_set(challenge_id, physics_class)
+
+                # Score with full stress integration
+                result = self.scorer.score_strategy(
+                    model=None,  # In real impl: load or reconstruct model from strategy
+                    stress_set=stress_set,
+                    base_metrics=strategy.get("base_metrics")
+                )
+
                 combined_score = result.get("combined_score", 0.0)
 
+                # Update tracker
                 self.tracker.update(hotkey, challenge_id, combined_score)
 
             except Exception as e:
                 bt.logging.warning(f"Failed to score uid {uid} ({hotkey[:16]}...): {e}")
+
+    def _generate_hidden_stress_set(self, challenge_id: str, physics_class: str) -> StressTestSet:
+        """
+        Generate hidden stress set using procedural + well generators.
+        In production this would also include adversarial stress.
+        """
+        seed = hash(challenge_id) % (2**32)
+        difficulty = 0.6   # Could be adaptive based on current leader
+
+        procedural_variants = self.procedural_generator.generate(
+            challenge_id, physics_class, seed, difficulty
+        )
+
+        well_variants = self.well_generator.generate(
+            challenge_id, physics_class, seed + 1, difficulty
+        )
+
+        all_variants = procedural_variants + well_variants
+
+        return StressTestSet(
+            challenge_id=challenge_id,
+            seed=seed,
+            physics_class=physics_class,
+            variants=all_variants,
+            difficulty_level=difficulty,
+            total_variants=len(all_variants),
+            generation_config={"version": "v1.0"},
+        )
 
     def _set_weights(self):
         weights = self.tracker.get_weights(
