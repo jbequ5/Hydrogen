@@ -1,7 +1,7 @@
 # neurons/validator.py
 
 """
-Hydrogen Validator - Fully integrated with determinism and hidden stress testing.
+Hydrogen Validator - Determinism fully integrated across evaluation.
 """
 
 import time
@@ -16,7 +16,11 @@ from neurons.stress.procedural_generator import ProceduralStressGenerator
 from neurons.stress.well_generator import WellStressGenerator
 from neurons.stress.stress_models import StressTestSet
 
-from neurons.utils.determinism import get_master_seed, get_sub_seeds
+from neurons.utils.determinism import (
+    get_master_seed,
+    get_sub_seeds,
+    setup_pytorch_determinism,
+)
 
 
 class Validator:
@@ -70,7 +74,12 @@ class Validator:
                 challenge_id = strategy.get("challenge_id", "default")
                 physics_class = strategy.get("physics_class", "hyperbolic")
 
-                # Generate hidden stress set using deterministic seeding
+                # Setup determinism for this evaluation
+                master_seed = get_master_seed(challenge_id, self.wallet.hotkey)
+                sub_seeds = get_sub_seeds(master_seed)
+                setup_pytorch_determinism(sub_seeds["training"])
+
+                # Generate hidden stress set (also deterministic)
                 stress_set = self._generate_hidden_stress_set(
                     challenge_id, physics_class, self.wallet.hotkey
                 )
@@ -90,9 +99,6 @@ class Validator:
     def _generate_hidden_stress_set(
         self, challenge_id: str, physics_class: str, validator_hotkey: str
     ) -> StressTestSet:
-        """
-        Generate hidden stress set using the centralized determinism system.
-        """
         master_seed = get_master_seed(challenge_id, validator_hotkey)
         sub_seeds = get_sub_seeds(master_seed)
 
