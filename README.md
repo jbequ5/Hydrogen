@@ -10,9 +10,9 @@ At its core, Hydrogen combines **adversarial evaluation**, **strong physics cons
 
 ## Vision
 
-To create a living, evolving library of reusable, physics-grounded surrogate models and specialists that dramatically accelerate engineering design, digital twins, real-time simulation, and scientific discovery — built through decentralized, adversarial, physics-constrained competition.
+To create a living, evolving library of reusable, physics-grounded surrogate models and specialists that dramatically accelerate engineering design, digital twins, real-time simulation, and scientific discovery — built through decentralized, adversarial, physics-constrained competition rather than centralized lab efforts.
 
-Longer term, Hydrogen aims to contribute to **foundational models of physics** that generalize across domains (fluids, solids, electromagnetics, plasmas, quantum-informed problems, etc.) while maintaining rigorous physical consistency.
+Longer term, Hydrogen aims to contribute to **foundational models of physics**: systems that can generalize across domains (fluids, solids, electromagnetics, plasmas, quantum-informed problems, etc.) while maintaining rigorous physical consistency.
 
 ---
 
@@ -23,105 +23,49 @@ Traditional engineering simulation is slow and expensive for large design spaces
 Hydrogen produces **physics-informed neural operator surrogates** that are:
 
 - **Fast** — orders of magnitude faster than traditional solvers once trained
-- **Physically consistent** — trained and stress-tested against hard physics constraints
-- **Robust** — evaluated under hidden stress conditions, making gaming and overfitting much harder
-- **Discoverable at scale** — decentralized competition surfaces better strategies than any single lab could explore
+- **Physically consistent** — trained and stress-tested against hard physics constraints (conservation, stability, boundary conditions, energy dissipation, etc.)
+- **Robust** — evaluated under hidden stress conditions and adaptive difficulty, making gaming and overfitting much harder
+- **Discoverable at scale** — decentralized competition surfaces better strategies than any single lab could reasonably explore
 
-This is particularly valuable for real-time digital twins, large-scale design optimization, HIL testing, and multi-physics problems.
-
----
-
-## Core Design Principles
-
-- Multi-objective physics-gated scoring (Physics Fidelity / Robustness / Accuracy)
-- Per-challenge leader tracking with exponential decay (`ChallengeWinnerTracker`)
-- Information asymmetry for anti-gaming (miners do not see hidden stress conditions or exact gate logic)
-- Decentralized adversarial strategy discovery
-- Future: Specialist distillation + verified multi-physics composition
+This combination is particularly valuable in:
+- Real-time digital twins
+- Large-scale design optimization and generative design
+- Hardware-in-the-Loop (HIL) testing
+- Multi-physics problems where traditional solvers become prohibitively slow
+- Regulated or safety-critical domains that demand physical fidelity
 
 ---
 
-## Current State (July 2026)
+## How It Works (Core Design)
 
-Hydrogen has completed foundational Phase 0 infrastructure:
+Hydrogen’s architecture rests on several interlocking principles:
 
-- `ChallengeWinnerTracker` with exponential decay and participation dust
-- `StrategyStore` abstraction
-- Multi-objective `HydrogenScorer`
-- Validator with dry-run mode
-- MCP server with persistent sessions and streaming validation
+### 1. Multi-Objective Physics-Gated Scoring
+Every submission is scored across three high-level objectives:
 
-Emissions currently follow standard Yuma Consensus. A hybrid model with Breakthrough Bounties and Decaying Stipends is planned but not yet active.
+- **Physics Fidelity** (45%) — residuals, conservation, boundary conditions, stability
+- **Robustness** (30%) — performance under hidden stress and long-term rollout
+- **Accuracy** (25%) — benchmark / hold-out performance
 
----
+Only strategies that beat the current best **combined score** on a challenge receive meaningful weight. Everything else is heavily discounted.
 
-## Phased Roadmap
+### 2. ChallengeWinnerTracker (Per-Challenge Leader Tracking)
+Inspired by Minos-style round-only winner logic but extended across multiple challenges:
 
-### Phase 0 (Current)
-Core infrastructure: per-challenge tracking, multi-objective physics-gated scoring, strategy storage, validator, and MCP tooling.
+- Tracks the best combined score **per challenge**
+- Applies exponential decay on old performance
+- Produces winner-heavy + participation dust weight distributions
+- Only genuine new leaders (on the combined physics + robustness + accuracy metric) drive emissions
 
-### Phase 1: Customization & Data Ingestion
-- Same 7 core PDE challenges
-- Miners add LoRA adapters and custom datasets
-- Abaqus ODB / .fil ingestion pipeline (miner submits `custom_data` with IPFS URI; validator parses and mixes with procedural data)
-- Expanded symbolic regression track (PySR + DataDrivenDiffEq)
+### 3. Decentralized Strategy Discovery
+Miners/agents propose training strategies (backbones, loss weights, curricula, architectures, etc.). The network adversarially evaluates them under hidden conditions. Better strategies rise. The Landscape Agent extracts causal insights and improves priors over time.
 
-### Phase 2: Multi-Physics Composition
-**Phase 2A** — Verified multi-physics benchmarks:
-- FSI (Turek/Hron 2D)
-- Conjugate Heat Transfer (CHT)
+### 4. Information Asymmetry (Anti-Gaming)
+Miners and agents see challenge descriptions, their own scores, and noisy/aggregated priors — but **not** the hidden stress conditions, exact physics gate implementations, or full internal scoring logic. This asymmetry is intentional and core to robustness.
 
-**Phase 2B** — Thermo-Elasticity (generate ~48 Tier-1 mesh-converged references)
-
-**Phase 2C** — Variant expansion on FSI/CHT/Thermo-elasticity (new Re, geometries, coupling strengths)
-
-Specialist pipelines + staggered coupling become first-class submission format.
-
-### Phase 3: 3D Multi-Physics
-- 3D FSI, 3D Thermo-Elasticity, 3D CHT with turbulence
-- Specialist composition using preCICE / FEniCS / OpenFOAM references
-- 3D-specific stress gates (energy spectrum, Q-criterion, wall shear, Nu distribution)
-- Curriculum from 2D → 3D specialists
-
-See `docs/FUTURE_DOMAINS.md` for the full domain expansion analysis (Electromagnetics, Photonics, Acoustics, Plasmas/Fusion, Quantum-informed, etc.).
+### 5. Reusable Specialists & Composition (Future)
+Over time, high-performing strategies are distilled into reusable ONNX specialists with validity domains. These can be composed into multi-physics pipelines. The Specialist Bank + data royalty model creates a flywheel of reusable, verified components.
 
 ---
 
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| `SPEC.md` | Full technical specification |
-| `docs/FUTURE_DOMAINS.md` | Future domains, how they fit, why they matter, market context |
-| `docs/VALIDATOR_GUIDE.md` | How to run and understand the validator |
-| `docs/EMISSIONS.md` | Current emissions model |
-| `docs/AGENT_USAGE.md` | MCP / Agent interaction guide |
-
----
-
-## Getting Started
-
-```bash
-git clone https://github.com/jbequ5/Hydrogen.git
-cd Hydrogen
-pip install -r requirements.txt
-python neurons/validator.py --dry_run true
-```
-
-See `docs/VALIDATOR_GUIDE.md` for details.
-
----
-
-## Contributing
-
-Contributions welcome in:
-- New challenges and physics gates
-- ChallengeWinnerTracker and scoring improvements
-- Agent tooling and MCP enhancements
-- Documentation
-
----
-
-## License
-
-MIT License
+*Hydrogen is an experiment in decentralized, physics-constrained scientific discovery. The goal is not just better surrogates — it is a new way to explore and encode physical knowledge at scale.*
