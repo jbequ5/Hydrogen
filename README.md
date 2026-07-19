@@ -38,7 +38,7 @@ The **Landscape Agent** creates a compounding moat by turning every submission i
 ## How the Engine Works — Clear Mechanism Walkthrough
 
 ### 1. Participation via MCP (Agent-Friendly with Built-in Testing Loop)
-Miners and agents interact through MCP, which supports persistent sessions, streaming validation/results, and easy local or remote testing of strategies. Agents can quickly iterate ideas against the live system or subsets of challenges and get immediate diagnostics.
+Miners and agents interact through MCP, which supports persistent sessions, streaming validation/results, and easy local or remote testing of strategies. This design makes participation seamless and gives agents a tangible fast-iteration advantage — they can quickly test ideas against the live system or subsets of challenges and receive immediate, actionable diagnostics.
 
 ### 2. Challenges by Phase
 - **Phase 0**: 7 core single-physics PDE challenges (Poisson, Darcy, Burgers, Navier-Stokes laminar, Heat, Elasticity, Thermo-elasticity).
@@ -58,16 +58,16 @@ Every submission goes through a rigorous, hidden validation process:
   - Accuracy (25%): Benchmark/hold-out performance.
   Only strategies that set a new best *combined score* on a challenge receive meaningful weight.
 
-This combination ensures surrogates are not just accurate on known data but genuinely robust and physically trustworthy under unseen conditions.
+This combination ensures surrogates are not just accurate on known data but genuinely robust and physically trustworthy under unseen conditions — critical for engineering adoption.
 
 ### 4. Feedback, Landscape Agent & Knowledge Compounding
 Agents receive detailed scores, gate outcomes, and diagnostics. All results are ingested by the **Landscape Agent**, which:
 - Extracts symbolic features (conservation laws, symmetries, etc., via PySR and planned ModelingToolkit integration).
-- Applies causal analysis (Double Machine Learning) to understand which strategy choices causally improve outcomes (e.g., certain loss-weight schedules causally improve long-term rollout stability under hidden stress variations).
+- Applies causal analysis (Double Machine Learning) to understand which strategy choices causally improve outcomes — for example, learning that certain loss-weight schedules or curriculum strategies causally improve long-term rollout stability under hidden stress variations.
 - Updates a compounding knowledge base and priors.
 - Drives specialist distillation and better future challenges.
 
-This creates accelerating returns: better data → better insights → better strategies → even richer data.
+This creates accelerating returns: better data → better insights → better strategies → even richer data. The Specialist Bank and knowledge base form a self-reinforcing flywheel and long-term moat.
 
 ### 5. Emissions & Incentives
 Current model uses standard Yuma Consensus with the **ChallengeWinnerTracker**:
@@ -81,11 +81,11 @@ Future phases add a hybrid model with Breakthrough Bounties (for record-setting 
 
 ## Why This Design Matters
 - **Robustness without centralization**: Hidden stress + physics gates create trustworthy evaluation at scale.
-- **Fast agent iteration**: MCP + built-in testing loop lowers barriers and speeds discovery.
+- **Fast agent iteration**: MCP + built-in testing loop lowers barriers and dramatically speeds discovery compared to traditional centralized labs.
 - **Compounding intelligence**: The Landscape Agent turns individual effort into collective, accelerating progress via symbolic and causal knowledge.
-- **Trust & Auditability**: Full determinism (hierarchical seeding, framework controls) and reproducibility make results credible and auditable across validators.
+- **Trust & Auditability**: Full determinism (hierarchical seeding, framework controls) and reproducibility make results credible and auditable across validators — essential for domain experts and scientific credibility.
 - **Aligned incentives**: Winner-heavy tracking with decay keeps focus on continuous, genuine improvement.
-- **Compounding Moat**: The Specialist Bank and knowledge base create network effects and data royalties.
+- **Compounding Moat**: The Specialist Bank and evolving knowledge base create network effects and data royalties.
 
 ---
 
@@ -93,6 +93,22 @@ Future phases add a hybrid model with Breakthrough Bounties (for record-setting 
 Phase 0 foundations (scoring, stress testing across all physics classes, determinism utilities, MCP basics, symbolic skeleton, full integration of stress into scoring) are advancing rapidly. Phase 1 adds customization, Abaqus ingestion, and deeper symbolic/causal capabilities. Phase 2 brings verified multi-physics with preCICE. Phase 3 expands to 3D and more advanced composition.
 
 See `SPEC.md`, `docs/FUTURE_DOMAINS.md`, and other docs in the repository for full technical details.
+
+---
+
+## Getting Started
+```bash
+git clone https://github.com/jbequ5/Hydrogen.git
+cd Hydrogen
+python neurons/validator.py --dry_run true   # Explore in dry-run mode
+```
+
+See the `docs/` folder for detailed guides (including MCP/agent usage and validator configuration).
+
+---
+
+## Contributing
+We welcome contributions in stress testing, determinism, symbolic integration, MCP enhancements, multi-physics composition, and testing infrastructure.
 
 ---
 
