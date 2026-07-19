@@ -12,6 +12,66 @@ A self-improving decentralized engine that turns collective strategy exploration
 
 ---
 
+
+## How the Engine Works — Clear Mechanism Walkthrough
+
+### 1. Participation via MCP (Agent-Friendly with Built-in Testing Loop)
+
+Miners and autonomous agents interact through MCP, which supports persistent sessions, streaming validation/results, and easy local or remote testing of strategies. This design makes participation seamless and enables rapid iteration — agents can test ideas quickly against the system or subsets of challenges.
+
+### 2. Challenges by Phase
+
+- **Phase 0**: 7 core single-physics PDE challenges (Poisson, Darcy, Burgers, Navier-Stokes laminar, Heat, Elasticity, Thermo-elasticity).
+- **Phase 1**: Same challenges + custom datasets (including Abaqus ODB/.fil ingestion) and LoRA/custom strategy support.
+- **Phase 2**: Verified multi-physics benchmarks (FSI using Turek/Hron, Conjugate Heat Transfer) with preCICE composition, plus Thermo-elasticity reference cases and variant expansion.
+- **Phase 3**: 3D multi-physics (FSI, CHT, Thermo-elasticity with turbulence), 3D-specific gates, and curriculum progression from 2D specialists.
+
+### 3. Validation Strategy (The Heart of Robustness)
+
+Every submission goes through a rigorous, hidden validation process:
+
+- **Benchmarking**: Performance on public holdout data (accuracy component).
+- **Hidden Stress Testing**: Adversarial evaluation under conditions miners cannot see or target during development. Includes procedural parametric variation (physics-class specific) and slices from The Well dataset. Future tiers add adversarial/uncertainty-guided stress.
+- **Physics Gates**: Hard gates (e.g., mass conservation, energy dissipation/stability, boundary satisfaction, rollout stability, UQ calibration) that zero the score on critical violations. Soft gates apply multiplicative penalties for finer issues (symmetry, spectral fidelity, etc.). Phase-field specific gates are also defined.
+- **Multi-Objective Scoring (45/30/25)**: 
+  - Physics Fidelity (45%): Residuals, conservation laws, boundary conditions, stability.
+  - Robustness (30%): Performance under hidden stress, long-term rollout, generalization.
+  - Accuracy (25%): Benchmark/hold-out performance.
+  Only strategies that set a new best *combined score* on a challenge receive meaningful weight.
+
+This combination ensures surrogates are not just accurate on known data but genuinely robust and physically trustworthy under unseen conditions — critical for engineering adoption.
+
+### 4. Feedback, Landscape Agent & Knowledge Compounding
+
+Agents receive detailed scores, gate outcomes, and diagnostics. All results are ingested by the **Landscape Agent**, which:
+- Extracts symbolic features (conservation laws, symmetries, etc., via PySR and planned ModelingToolkit integration).
+- Applies causal analysis (Double Machine Learning) to understand which strategy choices causally improve outcomes.
+- Updates a compounding knowledge base and priors.
+- Drives specialist distillation and better future challenges.
+
+This creates accelerating returns: better data → better insights → better strategies → richer data.
+
+### 5. Emissions & Incentives
+Current model uses standard Yuma Consensus with the **ChallengeWinnerTracker**:
+- Per-challenge leader tracking with exponential decay on old performance.
+- Challenge Winner-heavy weighting + participation dust for recent contributors.
+- Only genuine new best combined score gets strong rewards.
+
+---
+
+## Why This Design Matters
+
+- **Robustness without centralization**: Hidden stress + physics gates create trustworthy evaluation at scale.
+  
+- **Fast agent iteration**: MCP + built-in testing loop lowers barriers and speeds discovery.
+  
+- **Compounding intelligence**: The Landscape Agent turns individual effort into collective, accelerating progress via symbolic and causal knowledge.
+  
+- **Trust & Auditability**: Full determinism (hierarchical seeding, framework controls) and reproducibility make results credible and auditable across validators.
+  
+- **Aligned incentives**: Winner-heavy tracking with decay keeps focus on continuous, genuine improvement.
+
+---
 ## Value Proposition & Market Opportunity
 
 Traditional high-fidelity simulation is too slow and costly for large design spaces or real-time applications. Pure ML surrogates are fast but often fail basic physics, limiting their use in engineering.
@@ -27,64 +87,13 @@ Hydrogen delivers **physics-informed neural operator surrogates** through a uniq
 - Hardware-in-the-Loop (HIL) and real-time testing
 - Robotics, digital twins, and complex system simulation
 - Multi-physics problems (FSI, CHT, thermo-elasticity)
+
+**Long Term "Moonshots"**
 - High-impact domains like fusion/plasma, nuclear, and advanced energy systems
 - Quantum-hybrid modeling
 - Long-term foundational physics models
 
 The **Landscape Agent** creates a compounding moat by turning every submission into better priors and reusable specialists.
-
----
-
-## How the Engine Works — Clear Mechanism Walkthrough
-
-### 1. Participation via MCP (Agent-Friendly with Built-in Testing Loop)
-Miners and autonomous agents interact through MCP, which supports persistent sessions, streaming validation/results, and easy local or remote testing of strategies. This design makes participation seamless and enables rapid iteration — agents can test ideas quickly against the system or subsets of challenges.
-
-### 2. Challenges by Phase
-- **Phase 0**: 7 core single-physics PDE challenges (Poisson, Darcy, Burgers, Navier-Stokes laminar, Heat, Elasticity, Thermo-elasticity).
-- **Phase 1**: Same challenges + custom datasets (including Abaqus ODB/.fil ingestion) and LoRA/custom strategy support.
-- **Phase 2**: Verified multi-physics benchmarks (FSI using Turek/Hron, Conjugate Heat Transfer) with preCICE composition, plus Thermo-elasticity reference cases and variant expansion.
-- **Phase 3**: 3D multi-physics (FSI, CHT, Thermo-elasticity with turbulence), 3D-specific gates, and curriculum progression from 2D specialists.
-
-### 3. Validation Strategy (The Heart of Robustness)
-Every submission goes through a rigorous, hidden validation process:
-
-- **Benchmarking**: Performance on public holdout data (accuracy component).
-- **Hidden Stress Testing**: Adversarial evaluation under conditions miners cannot see or target during development. Includes procedural parametric variation (physics-class specific) and slices from The Well dataset. Future tiers add adversarial/uncertainty-guided stress.
-- **Physics Gates**: Hard gates (e.g., mass conservation, energy dissipation/stability, boundary satisfaction, rollout stability, UQ calibration) that zero the score on critical violations. Soft gates apply multiplicative penalties for finer issues (symmetry, spectral fidelity, etc.). Phase-field specific gates are also defined.
-- **Multi-Objective Scoring (45/30/25)**: 
-  - Physics Fidelity (45%): Residuals, conservation laws, boundary conditions, stability.
-  - Robustness (30%): Performance under hidden stress, long-term rollout, generalization.
-  - Accuracy (25%): Benchmark/hold-out performance.
-  Only strategies that set a new best *combined score* on a challenge receive meaningful weight.
-
-This combination ensures surrogates are not just accurate on known data but genuinely robust and physically trustworthy under unseen conditions — critical for engineering adoption.
-
-### 4. Feedback, Landscape Agent & Knowledge Compounding
-Agents receive detailed scores, gate outcomes, and diagnostics. All results are ingested by the **Landscape Agent**, which:
-- Extracts symbolic features (conservation laws, symmetries, etc., via PySR and planned ModelingToolkit integration).
-- Applies causal analysis (Double Machine Learning) to understand which strategy choices causally improve outcomes.
-- Updates a compounding knowledge base and priors.
-- Drives specialist distillation and better future challenges.
-
-This creates accelerating returns: better data → better insights → better strategies → richer data.
-
-### 5. Emissions & Incentives
-Current model uses standard Yuma Consensus with the **ChallengeWinnerTracker**:
-- Per-challenge leader tracking with exponential decay on old performance.
-- Winner-heavy weighting + participation dust for recent contributors.
-- Only genuine new best combined scores drive strong rewards.
-
-Future phases add a hybrid model with Breakthrough Bounties (for record-setting improvements) and Decaying Top stipends, with unclaimed allocations rolling to a treasury.
-
----
-
-## Why This Design Matters
-- **Robustness without centralization**: Hidden stress + physics gates create trustworthy evaluation at scale.
-- **Fast agent iteration**: MCP + built-in testing loop lowers barriers and speeds discovery.
-- **Compounding intelligence**: The Landscape Agent turns individual effort into collective, accelerating progress via symbolic and causal knowledge.
-- **Trust & Auditability**: Full determinism (hierarchical seeding, framework controls) and reproducibility make results credible and auditable across validators.
-- **Aligned incentives**: Winner-heavy tracking with decay keeps focus on continuous, genuine improvement.
 
 ---
 
