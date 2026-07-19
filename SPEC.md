@@ -1,6 +1,6 @@
 # SPEC.md — Hydrogen PDE Subnet Technical Specification
 
-**Version:** 3.2 (Updated July 2026)
+**Version:** 3.3 (Updated July 2026)
 **Status:** Active Development
 
 ---
@@ -50,73 +50,85 @@ Symbolic metadata will be preserved through specialist distillation (Symbolic Ga
 Core infrastructure: `ChallengeWinnerTracker`, `StrategyStore`, multi-objective physics-gated scorer, validator, MCP server, determinism.
 
 ### Phase 1: Customization & Data Ingestion
-- Same 7 core PDE challenges (Poisson, Darcy, Burgers, NS laminar, Heat, Elasticity, Thermo-elasticity)
+- Same 7 core PDE challenges
 - Miners submit LoRA adapters + custom datasets
-- **Abaqus ODB / .fil Ingestion Pipeline**:
-  - Miner submits `custom_data` with IPFS `data_uri` + checksum
-  - Validator verifies checksum, downloads, parses ODB or .fil
-  - Parses mesh + field outputs (stress, strain, displacement, history)
-  - Caches parsed `CustomDataset` and mixes with procedural data according to `weight` parameter
+- **Abaqus ODB / .fil Ingestion Pipeline** (miner submits `custom_data` with IPFS URI + checksum; validator parses and mixes with procedural data)
 - Expanded symbolic regression track using **PySR** + DataDrivenDiffEq
 
 ### Phase 2: Multi-Physics Composition
 
-**Phase 2A** — Verified multi-physics benchmarks (first 3–6 months)
-- FSI challenges (Turek/Hron 2D-1/2/3) with preCICE reference
-- Conjugate Heat Transfer (CHT) challenges with OpenFOAM/PDEBench references
-- Three-track leaderboard: Monolith / Composition / Specialist-Only
+**Coupling Framework: preCICE**
 
-**Phase 2B** — Thermo-Elasticity
-- Generate ~48 Tier-1 mesh-converged references (varying β, κ, geometry) at 256^{2} using FEniCS monolithic solver
-- Add thermo-elasticity challenges with `loss_vector` coupling terms
+preCICE is selected as the primary coupling library for Phase 2 multi-physics challenges (FSI, CHT, Thermo-Elasticity). It is a mature, open-source partitioned coupling library designed for black-box multi-physics simulations. It provides implicit/explicit coupling, advanced data mapping, coupling acceleration, and strong language bindings (including Python).
 
-**Phase 2C** — Variant expansion
-- New Reynolds numbers, geometries, and coupling strengths on FSI/CHT/Thermo-elasticity
-- Specialist Bank grows; reuse rate target >80%
-- Adapter innovation tracked as a key metric
+**Integration Approach**:
+- Specialists (e.g., `ns_2d`, `elasticity_2d`) are treated as black-box participants that implement the preCICE interface (or a thin Hydrogen adapter layer on top).
+- The validator orchestrates the coupled simulation: starting specialist containers, initializing preCICE, managing data exchange/mapping/time-stepping/convergence, and evaluating the coupled result against physics gates.
+- Two models are supported:
+  - **Black-box preCICE**: Miners submit solvers that already speak the preCICE API (preferred for Phase 2A reference benchmarks).
+  - **Hydrogen Adapter Layer**: A simplified interface that abstracts preCICE details for easier miner participation (target for Phase 2B+).
 
-Specialist pipeline JSON schema + staggered coupling execution become first-class supported submission format.
+**Phase 2A — Verified Benchmarks (First 3–6 months)**
+- FSI challenges (Turek/Hron 2D-1/2/3) using preCICE + OpenFOAM/CalculiX or equivalent reference solvers.
+- Conjugate Heat Transfer (CHT) challenges with preCICE + OpenFOAM/PDEBench references.
+- Three-track leaderboard: Monolith / Composition / Specialist-Only.
+- preCICE is used to create credible, research-grade coupled reference cases.
+
+**Phase 2B — Thermo-Elasticity**
+- Generate ~48 Tier-1 mesh-converged references (varying β, κ, geometry) at 256^{2} using FEniCS monolithic or preCICE-partitioned approaches.
+- Add thermo-elasticity challenges with `loss_vector` coupling terms.
+- preCICE or custom coupling used depending on solver availability.
+
+**Phase 2C — Variant Expansion**
+- New Reynolds numbers, geometries, and coupling strengths on FSI/CHT/Thermo-elasticity.
+- Specialist Bank grows; reuse rate target >80%.
+- preCICE-based composition becomes the dominant submission pattern for multi-physics challenges.
+
+**Rationale for preCICE**:
+- Best matches the black-box specialist + composition vision.
+- Mature ecosystem with validated reference cases.
+- Good Python bindings and containerization support.
+- Enables realistic, verifiable multi-physics benchmarks without Hydrogen having to implement coupling algorithms from scratch.
+- Alternatives (MOOSE monolithic, custom Python coupling, FEniCS internal coupling) were evaluated; preCICE was selected for its partitioned black-box nature and research adoption.
 
 ### Phase 3: 3D Multi-Physics (Post-Turbulence Bridge)
 
 **Phase 3.1** — 3D Turbulence Bridge (prerequisite)
-- 3D Spectral Initialization Protocol (proper Kolmogorov spectrum, not simple zero-pad)
-- Curriculum from 2D specialists → 3D (zero-pad + controlled noise → progressive resolution)
-- `ns_3d_turbulent` specialist with verified k^(-5/3) energy spectrum
-- 3D-specific stress gates: energy spectrum, Q-criterion, wall shear stress distribution, Nu distribution at corners
+- 3D Spectral Initialization Protocol
+- Curriculum from 2D specialists → 3D
+- `ns_3d_turbulent` specialist with verified k^(-5/3) spectrum
+- 3D-specific stress gates (energy spectrum, Q-criterion, wall shear, Nu distribution)
 
 **Phase 3.2** — 3D Multi-Physics Rollout
-- 3D FSI (cylinder/flap, turbulent) using `ns_3d_turbulent` + `elasticity_3d` + `fsi_3d_adapter` (preCICE partitioned reference)
-- 3D Thermo-Elasticity using `elasticity_3d` + `heat_3d` + `thermal_expansion_3d` (FEniCS reference)
-- 3D CHT using `ns_3d_turbulent` + `heat_3d` + `cht_3d_adapter` (OpenFOAM/COMSOL reference)
-- Same three-track leaderboard and stress testing applied to all 3D multi-physics challenges
+- 3D FSI, 3D Thermo-Elasticity, 3D CHT using preCICE (or evolved coupling layer) + appropriate 3D specialists and adapters.
+- Same three-track leaderboard and stress testing applied.
 
 **Phase 3.3** — Foundation Operator (LPM)
 - Multi-teacher distillation across entire Specialist Bank (2D + 3D)
 - FiLM conditioning on ProblemSignature + SymbolicMetadata
 - Evidential UQ head
-- Commercial fine-tuning API (TEE decryption → LoRA adaptation → stress-test verification → encrypted ONNX return)
+- Commercial fine-tuning API
 
 ---
 
 ## 5. Validator & Scoring Details
 
-(Physics gates tables, multi-objective formula, ChallengeWinnerTracker behavior, and determinism requirements are defined in earlier sections and remain unchanged.)
+(Physics gates tables, multi-objective formula, ChallengeWinnerTracker behavior, and determinism requirements remain as previously defined.)
 
 ---
 
 ## 6. Future Domains
 
-See `docs/FUTURE_DOMAINS.md` for the full analysis of additional high-value domains (Electromagnetics, Photonics, Acoustics, Plasmas/Fusion, Quantum-informed modeling, Climate, Nuclear, Biological systems, etc.).
+See `docs/FUTURE_DOMAINS.md` for the full analysis of additional domains (Electromagnetics, Photonics, Acoustics, Plasmas/Fusion, Quantum-informed modeling, etc.).
 
 ---
 
 ## 7. Current Limitations
 
-- Abaqus ingestion pipeline and full Phase 1–3 roadmap are planned but not yet implemented
-- Hybrid emissions model is defined but not active
-- Landscape Agent, specialist distillation, and Symbolic Gauntlet are future work
-- Multi-validator consistency and canonical ranking not yet stress-tested
+- Abaqus ingestion pipeline and full Phase 1–3 roadmap (including preCICE-based multi-physics composition) are planned but not yet implemented.
+- Hybrid emissions model is defined but not active.
+- Landscape Agent, specialist distillation, and Symbolic Gauntlet are future work.
+- Multi-validator consistency and canonical ranking not yet stress-tested.
 
 ---
 
