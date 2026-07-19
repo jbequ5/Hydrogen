@@ -2,7 +2,7 @@
 
 **Decentralized Discovery of Physics-Informed Neural Operator Strategies**
 
-Hydrogen is a Bittensor subnet (SN63) building a decentralized network for discovering high-quality, physics-respecting training strategies for complex engineering simulations.
+Hydrogen is a Bittensor subnet building a decentralized network for discovering high-quality, physics-respecting training strategies for complex engineering simulations.
 
 At its core, Hydrogen combines **adversarial evaluation**, **strong physics constraints**, and **decentralized strategy iteration** to produce fast, robust neural operator surrogates that outperform both traditional high-fidelity solvers (in speed) and black-box ML models (in physical consistency).
 
