@@ -1,6 +1,6 @@
 # SPEC.md — Hydrogen PDE Subnet Technical Specification
 
-**Version:** 3.0 (Updated July 2026)
+**Version:** 3.1 (Updated July 2026)
 **Status:** Active Development
 
 This document describes the technical architecture, scoring system, validator design, and long-term roadmap for Hydrogen, a Bittensor subnet (SN63) focused on decentralized discovery of high-quality Physics-Informed Neural Operator (PINO) strategies for engineering simulation.
@@ -101,16 +101,55 @@ Only submissions that set a new best **combined score** on a challenge contribut
 
 ---
 
-## 3. Validator Architecture
+## 3. Symbolic Layer & Equation Discovery (Core Planned Capability)
 
-### 3.1 Components
+Hydrogen places strong emphasis on **symbolic reasoning** alongside neural operators. This is not an add-on — it is a first-class part of the long-term architecture.
+
+### 3.1 Goals of the Symbolic Layer
+
+- Extract and exploit symmetries, conservation laws, and dimensionless groups from challenges
+- Enable automatic, physics-aware loss weighting
+- Support symbolic regression / equation discovery as a distinct competition track
+- Preserve symbolic metadata through specialist distillation
+- Provide richer features to the Landscape Agent for causal learning
+
+### 3.2 Key Tools
+
+| Tool | Role | Status |
+|------|------|--------|
+| **ModelingToolkit.jl** | Symbolic PDE representation, conservation laws, symmetries, acausal composition, auto loss weight generation | Planned (Phase 1+) |
+| **DataDrivenDiffEq.jl + PySR** | Symbolic regression / equation discovery track. Discover governing PDEs from trajectory data using sparse regression over basis functions. | Planned (Phase 1–2) |
+| **Symbolic Metadata Pipeline** | Per-challenge extraction of symmetries, conservation laws, boundary types, coupling terms, and validity domain. Used for auto loss weights and specialist grounding. | Planned |
+
+### 3.3 Symbolic Regression Track (PySR-powered)
+
+Miners/agents can submit discovered PDE strings + basis functions. The validator will:
+
+1. Verify the discovered equation against hidden stress data
+2. Compare predictive accuracy and physical consistency against neural baselines
+3. Award a **Symbolic Bonus** (planned) when the discovered equation improves baseline by >5% while remaining parsimonious
+
+This track runs in parallel with neural operator submissions and feeds into the Landscape Agent and Specialist Bank.
+
+### 3.4 Symbolic Gauntlet (Future Specialist Promotion)
+
+When distilling specialists, the system will verify that symbolic metadata is preserved:
+- Governing PDE / symmetries / conservation laws match the teacher ensemble
+- Validity domain is consistent
+- Generated CUDA kernels (via ModelingToolkit codegen) are valid and match numerical behavior
+
+---
+
+## 4. Validator Architecture
+
+### 4.1 Components
 
 - `HydrogenScorer` — Multi-objective evaluation (Physics / Robustness / Accuracy + fine-grained metrics)
 - `ChallengeWinnerTracker` — Per-challenge leader tracking with exponential decay
 - `StrategyStore` — Abstraction for retrieving miner strategies (currently local file backed)
 - Backbone images (pinned, pre-built) for deterministic training
 
-### 3.2 Validation Pipeline (High-Level)
+### 4.2 Validation Pipeline (High-Level)
 
 1. Retrieve strategy via `StrategyStore`
 2. Train backbone on challenge training split (deterministic seed derived from challenge_id + validator hotkey)
@@ -118,9 +157,9 @@ Only submissions that set a new best **combined score** on a challenge contribut
 4. Run hidden stress test + physics gates
 5. Compute combined score
 6. Update `ChallengeWinnerTracker`
-7. (Future) Feed rich per-evaluation data to Landscape Agent
+7. (Future) Feed rich per-evaluation data + symbolic features to Landscape Agent
 
-### 3.3 Determinism
+### 4.3 Determinism
 
 Training and stress testing are made deterministic via:
 - Fixed random seeds derived from challenge_id + validator hotkey
@@ -129,9 +168,9 @@ Training and stress testing are made deterministic via:
 
 ---
 
-## 4. Miner / Agent Interface
+## 5. Miner / Agent Interface
 
-### 4.1 Strategy JSON Schema (Current Phase 0-1)
+### 5.1 Strategy JSON Schema (Current Phase 0-1)
 
 ```json
 {
@@ -143,20 +182,21 @@ Training and stress testing are made deterministic via:
   "curriculum_learning": { ... },
   "uq_config": { ... },
   "custom_data": { ... },
-  "backend": "pytorch" | "jax" | "sciml"
+  "backend": "pytorch" | "jax" | "sciml",
+  "symbolic_regression": { ... }   // Future track
 }
 ```
 
-### 4.2 Submission Rules (Current)
+### 5.2 Submission Rules (Current)
 - One active submission per miner per challenge (last submission counts)
 - Format: JSON
 - Fee: 0.1 TAO (burned on pre-check failure)
 
 ---
 
-## 5. Challenge Specification (Current Focus)
+## 6. Challenge Specification (Current Focus)
 
-### 5.1 Phase 0 Challenges (7 Core PDEs)
+### 6.1 Phase 0 Challenges (7 Core PDEs)
 
 | ID | Problem | Dimension | Key Physics |
 |----|---------|-----------|-------------|
@@ -176,7 +216,7 @@ Each challenge includes:
 
 ---
 
-## 6. Future Domains & Expansion Roadmap
+## 7. Future Domains & Expansion Roadmap
 
 See the dedicated document `docs/FUTURE_DOMAINS.md` for a full analysis of high-potential future domains, including:
 
@@ -199,11 +239,11 @@ See the dedicated document `docs/FUTURE_DOMAINS.md` for a full analysis of high-
 
 ---
 
-## 7. SciML Ecosystem Integration (Planned)
+## 8. SciML Ecosystem Integration (Planned)
 
 Hydrogen is designed to integrate first-class with the SciML ecosystem:
 
-- **ModelingToolkit.jl** — Symbolic PDE representation, conservation laws, symmetries, auto loss weights
+- **ModelingToolkit.jl** — Symbolic PDE representation, conservation laws, symmetries, acausal composition, auto loss weight generation
 - **NeuralOperators.jl / jNO** — Reference neural operator implementations (PyTorch + JAX)
 - **DataDrivenDiffEq.jl + PySR** — Symbolic regression / equation discovery track
 - **SciMLSensitivity.jl** — High-quality adjoints for physics-informed training
@@ -213,12 +253,12 @@ These tools will be used for symbolic metadata generation, specialist distillati
 
 ---
 
-## 8. Landscape Agent & Causal Learning (Future)
+## 9. Landscape Agent & Causal Learning (Future)
 
 Once rich per-evaluation data pipelines are mature, the Landscape Agent will:
 
-- Ingest StrategyFragments (config, improvement, stress results, physics metrics)
-- Enrich with symbolic features
+- Ingest StrategyFragments (config, improvement, stress results, physics metrics, symbolic features)
+- Enrich with symbolic features extracted via ModelingToolkit / PySR
 - Run Double Machine Learning (DML) for heterogeneous treatment effects
 - Propose baseline updates and specialist distillation candidates
 - Maintain causal lineage for specialist promotion
@@ -227,7 +267,7 @@ This component is **not yet active** in the current implementation.
 
 ---
 
-## 9. Information Asymmetry & Anti-Gaming
+## 10. Information Asymmetry & Anti-Gaming
 
 Miners and agents have access to:
 - Challenge descriptions
@@ -244,17 +284,17 @@ This asymmetry is intentional and is one of Hydrogen’s core robustness mechani
 
 ---
 
-## 10. Current Limitations & Open Work
+## 11. Current Limitations & Open Work
 
 - Strategy retrieval is currently local-file based (platform-backed store planned)
 - Hybrid emissions model (bounties + stipends + treasury) is defined but not implemented
 - Landscape Agent and specialist distillation pipeline are future work
 - Multi-validator consistency and canonical ranking not yet stress-tested
-- Symbolic layer (ModelingToolkit integration, auto loss weights, Symbolic Gauntlet) is planned but not active
+- Symbolic layer (ModelingToolkit integration, PySR track, auto loss weights, Symbolic Gauntlet) is planned but not yet active
 
 ---
 
-## 11. Documentation & Related Files
+## 12. Documentation & Related Files
 
 - `README.md` — High-level project overview and vision
 - `docs/FUTURE_DOMAINS.md` — Detailed future domain analysis (How, Why, Market)
