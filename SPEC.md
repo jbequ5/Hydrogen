@@ -1,143 +1,310 @@
-# SPEC.md — Hydrogen PDE Subnet Technical Specification
+# SPEC.md — Hydrogen PDE Subnet Technical Specification (Buildable Level)
 
-**Version:** 3.5 (Updated July 2026)
-**Status:** Active Development
+**Version:** 4.0 (Updated July 2026)
+**Status:** Active Development — Buildable Reference
+
+This document provides build-level detail sufficient to implement the core Hydrogen system. It includes data models, interfaces, algorithms, flows, and integration points.
 
 ---
 
 ## 1. System Overview & Core Agentic Loop
 
-Hydrogen is a decentralized, agentic system for discovering high-quality, physics-respecting training strategies for neural operator surrogates in engineering and scientific simulation.
+**High-Level Flow**:
+1. Agent/Miner submits strategy JSON via MCP.
+2. Validator retrieves strategy, sets up determinism (master seed from challenge_id + validator hotkey).
+3. Deterministic training on challenge data.
+4. Hidden StressTestSet generation & evaluation.
+5. Physics gate application + multi-objective scoring.
+6. Results + diagnostics returned to agent via MCP.
+7. Full evaluation data (including stress results and symbolic features) ingested by Landscape Agent.
+8. Landscape Agent performs symbolic extraction + causal analysis (DML) and updates knowledge base/priors.
+9. Tracker updated; weights computed and submitted (Yuma).
 
-**Core Loop**:
-MCP-enabled Agent/Miner Submission → Validator (deterministic training + hidden stress testing + physics gates) → Multi-Objective Scoring & Detailed Feedback → Results returned to agent + ingestion into Landscape Agent → Causal/symbolic analysis & knowledge base update → Improved priors for future submissions → Compounding discovery.
-
-**Design Philosophy**:
-- Physics fidelity first via hard/soft gates and multi-objective scoring.
-- Adversarial robustness through hidden stress testing.
-- Agent-friendly participation via MCP with built-in testing/feedback loops.
-- Information asymmetry to prevent gaming while preserving learning signals.
-- Landscape Agent for symbolic feature extraction and causal (DML) knowledge compounding.
-- Determinism and auditability for trust.
-- Decentralized strategy discovery with aligned incentives.
-
-**Current Economics**: Standard Yuma + ChallengeWinnerTracker (per-challenge leader tracking with exponential decay and winner-heavy + dust weighting). Hybrid bounty/stipend model planned for later phases.
+**Key Components**:
+- MCP Server (agent communication, testing loop, streaming).
+- Validator (orchestration, determinism, stress generation, scoring).
+- HydrogenScorer + StressEvaluator.
+- ChallengeWinnerTracker.
+- Landscape Agent (symbolic + causal compounding).
+- Stress Generators (Procedural + Well, registry-based).
+- Symbolic Layer (extractor + PySR runner).
 
 ---
 
 ## 2. MCP / Agent Interface & Built-in Testing Loop
 
-**MCP (Miner/Agent Communication Protocol)** enables seamless, agent-friendly interaction:
-- Persistent sessions and streaming validation/results.
-- Easy local or remote testing of strategies against the live system or subsets.
-- Low-friction submission and feedback loop designed specifically for autonomous agents and human-in-the-loop workflows.
+**Purpose**: Make participation seamless for autonomous agents and humans with fast iteration.
 
-This design dramatically lowers the barrier to participation and accelerates the rate of strategy iteration and discovery.
+**Core Features**:
+- Persistent sessions (stateful agent-validator interaction).
+- Streaming validation and results (real-time feedback during evaluation).
+- Built-in testing loop: Agents can request evaluation on subsets of challenges, specific stress tiers, or local dry-runs.
+- Strategy submission format (JSON with backbone, loss weights, curriculum, custom_data, etc.).
+- Result format: Scores, gate violations, detailed metrics, diagnostics, symbolic features.
 
----
+**Implementation Notes**:
+- MCP server handles authentication (hotkey-based), session management, and streaming (e.g., via WebSocket or gRPC).
+- Agents can call testing endpoints to evaluate strategies without full network weight impact.
+- Supports both synchronous and asynchronous submission modes.
 
-## 3. Validation Mechanism (Detailed)
-
-**Pipeline**:
-1. Strategy retrieval (via StrategyStore).
-2. Deterministic training (seeded from challenge_id + validator identity).
-3. Hidden Stress Test Generation & Evaluation (procedural + Well-based; future adversarial tiers).
-4. Physics Gate Application (hard gates = 0 on violation; soft penalties).
-5. Multi-Objective Scoring (Physics Fidelity 45%, Robustness 30%, Accuracy 25%).
-6. Results + diagnostics returned; full data ingested by Landscape Agent.
-
-**Determinism Guarantees**:
-Hierarchical seeding (master seed from challenge + validator hotkey → sub-seeds for data, training, stress, scoring). PyTorch/JAX determinism flags, DataLoader generators, and environment provenance recording. Reproducibility Harness for verification.
-
-**Stress Test System** (see docs/STRESS_TEST_DESIGN.md for full spec):
-- Tier 1: Procedural parametric variation (physics-class specific, difficulty-adaptive).
-- Tier 2: The Well dataset slices with physics-preserving augmentations.
-- Tier 3 (future): Adversarial/uncertainty-guided/Pareto stress.
-- Full access control (validator-private), auditability, and physical justification metadata.
-
-**Information Asymmetry**: Agents see scores and useful diagnostics but not exact hidden stress conditions or internal gate implementations.
+See related design notes in conversation history for exact message schemas (to be formalized in v4.1).
 
 ---
 
-## 4. Scoring System
+## 3. Data Models (Core)
 
-Multi-objective with combined score. Only new best combined scores on a challenge drive strong weighting via ChallengeWinnerTracker.
+**StressVariant**:
+```python
+@dataclass
+class StressVariant:
+    variant_id: str
+    source: StressSource  # PROCEDURAL | WELL | ADVERSARIAL
+    parameters: Dict[str, Any]
+    well_dataset: Optional[str] = None
+    difficulty: float = 0.5
+    metadata: Dict[str, Any] = field(default_factory=dict)  # includes physics_justification
+```
 
-Physics gates (hard = 0 on critical violations like mass conservation, energy stability, boundary satisfaction; soft multiplicative penalties). Detailed metrics returned for feedback and Landscape ingestion.
+**StressTestSet**:
+```python
+@dataclass
+class StressTestSet:
+    challenge_id: str
+    seed: int
+    physics_class: str
+    variants: List[StressVariant]
+    difficulty_level: float
+    total_variants: int
+    generation_config: Dict[str, Any]
+    metadata: Dict[str, Any] = field(default_factory=dict)
+```
 
----
+**SymbolicMetadata**:
+```python
+@dataclass
+class SymbolicMetadata:
+    challenge_id: str
+    symmetries: List[str] = field(default_factory=list)
+    conservation_laws: List[str] = field(default_factory=list)
+    boundary_types: List[str] = field(default_factory=list)
+    coupling_terms: List[str] = field(default_factory=list)
+    dimensionless_groups: List[str] = field(default_factory=list)
+    extracted_at: str = ""
+    version: str = "v0.1"
+    metadata: Dict[str, Any] = field(default_factory=dict)
+```
 
-## 5. ChallengeWinnerTracker & Incentives
+**Challenge** (from generate_challenge):
+Includes training/holdout references, stress_config, symbolic_metadata, difficulty, etc.
 
-Per-challenge tracking with exponential decay. Produces winner-heavy + participation dust weights. Only genuine improvements on the physics + robustness + accuracy metric are strongly rewarded.
-
----
-
-## 6. Landscape Agent Architecture (Symbolic & Causal Compounding)
-
-**Core Function**: Ingests evaluation results (strategy configs, performance under stress, symbolic features, metrics) and compounds knowledge.
-
-**Components**:
-- **Symbolic Processing**: Extracts/uses conservation laws, symmetries, dimensionless groups, boundary types (via PySR, ModelingToolkit integration planned). Enriches data and supports auto loss weighting.
-- **Causal Learning**: Double Machine Learning (DML) to estimate heterogeneous treatment effects of strategy choices (e.g., loss weight schedules, backbone choices, curricula) on outcomes.
-- **Knowledge Base & Prior Updating**: Maintains evolving priors and causal insights that improve future strategy generation and evaluation.
-- **Outputs**: Better priors for agents, specialist distillation candidates, causal reports, Symbolic Gauntlet inputs.
-
-This creates compounding returns: better data → better insights → better strategies → even richer data.
-
-**Integration**: Feeds into specialist promotion, multi-physics composition, and long-term Foundation Operator development.
-
----
-
-## 7. Symbolic Layer
-
-- ModelingToolkit.jl for symbolic PDE representation, conservation laws, and auto loss weights.
-- DataDrivenDiffEq.jl + PySR for symbolic regression track (discover governing equations validated on hidden stress data).
-- SymbolicMetadataExtractor (rule-based Phase 0; advanced later).
-- Symbolic Gauntlet during specialist distillation to preserve symbolic properties.
-
-See docs/SYMBOLIC_LAYER_DESIGN.md for details.
-
----
-
-## 8. Challenge Generation
-
-Deterministic `generate_challenge()` function that produces training/holdout references, stress configuration, and attaches SymbolicMetadata. Supports future advanced stress and multi-physics definitions.
-
-See docs/CHALLENGE_GENERATION_DESIGN.md.
-
----
-
-## 9. Validator Implementation
-
-Orchestrates MCP handling, deterministic training/stress generation (using centralized seeding utilities), StressEvaluator integration, scoring, and weight submission via ChallengeWinnerTracker.
-
-Full determinism setup (PyTorch flags, sub-seeds) applied per evaluation.
-
----
-
-## 10. Phased Roadmap (Build-Level)
-
-**Phase 0 (Current Foundations)**: Core scoring, stress testing (procedural + Well for all physics classes), determinism utilities, MCP basics, ChallengeWinnerTracker, symbolic skeleton (PySR runner + metadata), StressEvaluator integration.
-
-**Phase 1**: Abaqus ODB/.fil custom data ingestion, expanded symbolic capabilities, LoRA/custom dataset support, deeper determinism across data loading/training, initial Landscape Agent causal/symbolic updates.
-
-**Phase 2**: Verified multi-physics composition using preCICE (FSI, CHT, Thermo-elasticity benchmarks and variant expansion). Specialist pipelines and staggered coupling. Growing Specialist Bank.
-
-**Phase 3**: 3D multi-physics (FSI, CHT, Thermo-elasticity with turbulence), 3D-specific gates and curriculum from 2D. Advanced Landscape Agent compounding and Foundation Operator/LPM foundations.
+**SymbolicRegressionResult** (from PySR):
+```python
+@dataclass
+class SymbolicRegressionResult:
+    equation: str
+    complexity: int
+    score: float
+    loss: float
+    metadata: Dict[str, Any]
+```
 
 ---
 
-## 11. Future Domains
+## 4. Determinism System (Buildable Details)
 
-See docs/FUTURE_DOMAINS.md for detailed analysis of Electromagnetics, Photonics, Acoustics, Plasmas/Fusion, Quantum-informed modeling, Climate, Nuclear, Biological systems, and others.
+**Master Seed Derivation**:
+```python
+def get_master_seed(challenge_id: str, validator_hotkey: str) -> int:
+    combined = f"{challenge_id}:{validator_hotkey}"
+    return int(hashlib.sha256(combined.encode()).hexdigest(), 16) % (2**32)
+```
+
+**Sub-seeds**:
+```python
+def get_sub_seeds(master_seed: int) -> Dict[str, int]:
+    # Returns dict with keys: data_loading, augmentation, training, stress_generation, noise, scoring
+```
+
+**Setup Functions**:
+- `setup_pytorch_determinism(seed)`: Sets torch.manual_seed, cuda seeds, use_deterministic_algorithms(True), cudnn flags, environment variables.
+- `get_data_loader_generator(seed)`: Returns seeded torch.Generator for DataLoader shuffling.
+- `setup_determinism_for_component(component, master_seed)`: Convenience wrapper.
+
+Applied at: Validator evaluation start, stress generation, scoring, and any training/augmentation steps.
+
+**Reproducibility Harness**: Run evaluation twice and compare scores, tensors (within tolerance), and gate outcomes. Log full environment (Docker digest, package versions, CUDA/cuDNN, git commit).
+
+See docs/DETERMINISM_DESIGN.md for full spec.
 
 ---
 
-## 12. Current Limitations
+## 5. Stress Test System (Buildable)
 
-Full adversarial stress tiers, complete Landscape Agent causal/symbolic compounding loop, preCICE-orchestrated multi-physics, and advanced determinism in data/training loops are in active development or planned for near-term phases.
+**Generators**:
+- `BaseStressGenerator` abstract class with `generate(challenge_id, physics_class, seed, difficulty) -> List[StressVariant]`.
+- `StressGeneratorRegistry`: Maps physics_class to list of generators.
+- `ProceduralStressGenerator`: Deep implementations per physics class (see current code for parameter variation logic per elliptic/hyperbolic/parabolic/incompressible/elasticity/multi-physics).
+- `WellStressGenerator`: Dataset mapping + sampling with physics-preserving augmentations.
+
+**Generation**:
+- Use sub-seed for stress_generation.
+- Scale number of variants and parameter ranges with difficulty.
+- Attach rich metadata (physics_justification) to every variant.
+
+**Access Control**: Store raw StressTestSet in validator-private storage. Only final scores/gate results exposed via MCP.
+
+**Audit**: Any validator can regenerate exact set from challenge_id + validator hotkey + recorded generation_config.
+
+See `neurons/stress/` implementation and docs/STRESS_TEST_DESIGN.md.
 
 ---
 
-*This specification captures both implemented foundations and the detailed build roadmap for the agentic, compounding physics surrogate discovery engine.*
+## 6. Validation Pipeline (Step-by-Step Buildable Flow)
+
+1. Receive strategy via MCP.
+2. Derive master_seed and sub_seeds.
+3. Call `setup_pytorch_determinism(sub_seeds["training"])`.
+4. Load/generate Challenge (training/holdout + stress_config + symbolic_metadata).
+5. Train model deterministically.
+6. Generate StressTestSet using generators + sub_seeds.
+7. Evaluate model on stress variants via StressEvaluator.
+8. Apply hard gates (zero score on violation) and soft gates.
+9. Compute multi-objective scores.
+10. Return detailed results via MCP.
+11. Ingest full data (config, metrics, stress results, symbolic features) to Landscape Agent.
+12. Update ChallengeWinnerTracker.
+
+**StressEvaluator**:
+- Accepts model + StressTestSet (+ optional master_seed).
+- Runs inference on variants (real implementation replaces simulation).
+- Calls scorer.check_hard_gates() and apply_soft_gates().
+- Computes stress_score_contribution (0 on hard failure).
+
+See current `neurons/validator.py`, `HydrogenScorer`, and `StressEvaluator` for reference implementations.
+
+---
+
+## 7. Scoring Details
+
+**Objectives**:
+- Physics Fidelity (45%): Residual norms, conservation errors, boundary violations, stability metrics.
+- Robustness (30%): Stress performance, rollout stability, generalization.
+- Accuracy (25%): Holdout/benchmark error.
+
+**Combined Score**: Weighted average, modulated by stress contribution (e.g., combined *= (0.7 + 0.3 * stress_contribution)).
+
+Hard gates zero the overall score on critical violations. Soft gates reduce sub-scores.
+
+See `HydrogenScorer.evaluate_with_stress()` implementation.
+
+---
+
+## 8. ChallengeWinnerTracker
+
+Per-challenge best combined score tracking.
+Exponential decay (default 0.85) on historical performance.
+Winner-heavy weighting + participation dust.
+Only new best combined scores update leader significantly.
+
+See current implementation and docs for exact update logic.
+
+---
+
+## 9. Landscape Agent (Buildable Architecture)
+
+**Ingestion**:
+Receives StrategyFragments containing: strategy config, training metrics, stress results (gates, scores, per-variant performance), symbolic features.
+
+**Processing**:
+- Symbolic: Enrich with conservation laws, symmetries (from extractor or PySR).
+- Causal: Double Machine Learning (DML) to estimate effects of hyperparameters/choices on outcomes (treatment = strategy feature, outcome = combined score or robustness).
+- Knowledge Base: Update priors, causal graphs, and specialist performance history.
+
+**Outputs**:
+- Updated priors for agents (via MCP or challenge metadata).
+- Specialist distillation candidates.
+- Causal insights for roadmap/challenge design.
+- Inputs to Symbolic Gauntlet.
+
+**Future**: Integration with multi-physics composition and Foundation Operator (LPM with FiLM conditioning, evidential UQ).
+
+See design notes for DML implementation sketch and data schemas.
+
+---
+
+## 10. Symbolic Layer
+
+**Metadata Extraction**:
+`SymbolicMetadataExtractor.extract(challenge_id, config) -> SymbolicMetadata` (rule-based Phase 0; ModelingToolkit upgrade planned).
+
+**PySR Track**:
+`PySRTrackRunner.run(trajectories, challenge_id, config) -> SymbolicRegressionResult`.
+Graceful fallback if pysr not installed. Configurable parsimony, operators, iterations.
+
+**Integration Points**:
+- Attached to Challenge objects.
+- Used in Landscape Agent.
+- Planned: Auto loss weighting, Symbolic Gauntlet during distillation.
+
+See `neurons/symbolic/` and docs/SYMBOLIC_LAYER_DESIGN.md.
+
+---
+
+## 11. Challenge Generation
+
+```python
+def generate_challenge(challenge_id: str, config: Optional[Dict] = None) -> Challenge:
+    # Deterministic
+    # Attaches symbolic_metadata via extractor
+    # Includes stress_config and training/holdout references
+```
+
+Supports physics_class-specific stress configuration and future multi-physics definitions.
+
+---
+
+## 12. Phased Roadmap (Build-Level Deliverables)
+
+**Phase 0**:
+- Stress generators (procedural deep per class + Well) with determinism.
+- StressEvaluator + full integration into HydrogenScorer and validator.
+- Determinism utilities (seeding, setup functions, harness).
+- MCP basics + testing loop.
+- Symbolic skeleton (extractor + PySR runner).
+- ChallengeWinnerTracker.
+- generate_challenge() with symbolic attachment.
+
+**Phase 1**:
+- Abaqus ODB/.fil ingestion pipeline (parse_abaqus_odb, parse_abaqus_fil, CustomDataset).
+- Expanded Landscape Agent (initial DML causal updates, symbolic enrichment).
+- Deeper determinism in data loading/augmentation/training.
+- Custom dataset + LoRA support in strategy schema.
+
+**Phase 2**:
+- preCICE integration for multi-physics (FSI/CHT/Thermo-elasticity).
+- Specialist pipeline JSON schema and execution.
+- Growing Specialist Bank + distillation.
+- Variant expansion and reference generation (48 Tier-1 cases, etc.).
+
+**Phase 3**:
+- 3D turbulence bridge and 3D multi-physics.
+- Advanced Landscape Agent compounding and outputs.
+- Foundation Operator foundations (LPM, FiLM, UQ).
+
+---
+
+## 13. Current Implementation References
+
+Key files:
+- `neurons/stress/` (models, generators, evaluator)
+- `neurons/scoring/hydrogen_scorer.py` (with stress integration)
+- `neurons/validator.py` (full loop with determinism and MCP handling)
+- `neurons/symbolic/` (models, extractor, pysr_runner)
+- `neurons/utils/determinism.py`
+- `neurons/challenge/generator.py`
+
+See individual design docs in `docs/` for deeper supporting specifications.
+
+---
+
+*This specification is intended as a buildable reference. Implementations should match the interfaces, data models, and flows described above.*
