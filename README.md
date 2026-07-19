@@ -21,10 +21,14 @@ Miners and autonomous agents interact through MCP, which supports persistent ses
 
 ### 2. Challenges by Phase
 
-- **Phase 0**: 7 core single-physics PDE challenges (Poisson, Darcy, Burgers, Navier-Stokes laminar, Heat, Elasticity, Thermo-elasticity).
-- **Phase 1**: Same challenges + custom datasets (including Abaqus ODB/.fil ingestion) and LoRA/custom strategy support.
-- **Phase 2**: Verified multi-physics benchmarks (FSI using Turek/Hron, Conjugate Heat Transfer) with preCICE composition, plus Thermo-elasticity reference cases and variant expansion.
-- **Phase 3**: 3D multi-physics (FSI, CHT, Thermo-elasticity with turbulence), 3D-specific gates, and curriculum progression from 2D specialists.
+- **Phase 0**:
+7 core single-physics PDE challenges (Poisson, Darcy, Burgers, Navier-Stokes laminar, Heat, Elasticity, Thermo-elasticity).
+- **Phase 1**:
+Same challenges + custom datasets (including Abaqus ODB/.fil ingestion) and LoRA/custom strategy support.
+- **Phase 2**:
+Verified multi-physics benchmarks (FSI using Turek/Hron, Conjugate Heat Transfer) with preCICE composition, plus Thermo-elasticity reference cases and variant expansion.
+- **Phase 3**:
+3D multi-physics (FSI, CHT, Thermo-elasticity with turbulence), 3D-specific gates, and curriculum progression from 2D specialists.
 
 ### 3. Validation Strategy (The Heart of Robustness)
 
