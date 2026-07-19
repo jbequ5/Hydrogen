@@ -1,71 +1,98 @@
 # Hydrogen
 
-**Decentralized Discovery of Physics-Informed Neural Operator Strategies**
+**Decentralized Agentic Engine for Physics-Informed Neural Operator Discovery**
 
-Hydrogen is a Bittensor subnet building a decentralized network for discovering high-quality, physics-respecting training strategies for complex engineering simulations.
+Hydrogen is a Bittensor subnet that builds a decentralized, agentic system for discovering fast, robust, and physics-respecting training strategies for complex engineering simulations and surrogates.
 
-At its core, Hydrogen combines **adversarial evaluation**, **strong physics constraints**, and **decentralized strategy iteration** to produce fast, robust neural operator surrogates that outperform both traditional high-fidelity solvers (in speed) and black-box ML models (in physical consistency).
+At its core, it combines **MCP-enabled agent participation with built-in testing loops**, **rigorous hidden adversarial validation**, and a **Landscape Agent that compounds symbolic and causal knowledge** over time. The result is an accelerating engine that produces high-fidelity surrogates far more effectively than centralized approaches.
 
 ---
 
 ## Vision
 
-To create a living, evolving library of reusable, physics-grounded surrogate models and specialists that dramatically accelerate engineering design, digital twins, real-time simulation, and scientific discovery — built through decentralized, adversarial, physics-constrained competition rather than centralized lab efforts.
-
-Longer term, Hydrogen aims to contribute to **foundational models of physics**: systems that can generalize across domains (fluids, solids, electromagnetics, plasmas, quantum-informed problems, etc.) while maintaining rigorous physical consistency.
+A self-improving, decentralized intelligence layer for physical modeling — where agents and a central Landscape Agent together create a compounding library of reusable, physics-grounded surrogates and specialists. Over time, this evolves toward foundational models of physics that generalize across domains while maintaining rigorous consistency and interpretability.
 
 ---
 
-## Value Proposition
+## Value Proposition & Market Opportunity
 
-Traditional engineering simulation is slow and expensive for large design spaces or real-time use. Pure data-driven ML surrogates are fast but often lack physical trustworthiness.
+Traditional high-fidelity simulation is too slow and expensive for large design spaces, real-time use, or massive optimization. Pure data-driven ML surrogates are fast but frequently lack physical trustworthiness, making them risky for engineering applications.
 
-Hydrogen produces **physics-informed neural operator surrogates** that are:
+Hydrogen solves this by producing **physics-informed neural operator surrogates** through a unique combination of:
 
-- **Fast** — orders of magnitude faster than traditional solvers once trained
-- **Physically consistent** — trained and stress-tested against hard physics constraints (conservation, stability, boundary conditions, energy dissipation, etc.)
-- **Robust** — evaluated under hidden stress conditions and adaptive difficulty, making gaming and overfitting much harder
-- **Discoverable at scale** — decentralized competition surfaces better strategies than any single lab could reasonably explore
+- **Valuable Causal Dataset**: Every evaluation generates rich, physics-grounded data under hidden stress conditions, including symbolic features and causal relationships between strategy choices and outcomes. This dataset is far more informative than standard benchmarks and compounds over time.
 
-This combination is particularly valuable in:
-- Real-time digital twins
-- Large-scale design optimization and generative design
-- Hardware-in-the-Loop (HIL) testing
-- Multi-physics problems where traditional solvers become prohibitively slow
-- Regulated or safety-critical domains that demand physical fidelity
+- **Custom Surrogate Design Engine**: Via MCP and the agent-friendly loop with built-in testing, participants can rapidly develop and validate custom surrogates tailored to specific problems, geometries, or multi-physics couplings — not generic one-size-fits-all models.
 
----
+- **Broad & High-Value Market Opportunities**:
+  - **Core Engineering Simulation (CAE)**: Dramatically faster design exploration and optimization in aerospace, automotive, energy, and manufacturing.
+  - **Hardware-in-the-Loop (HIL) & Real-Time Testing**: Fast, physics-respecting surrogates enable more complex real-time validation loops.
+  - **Robotics & Digital Twins**: Accurate, fast models for robot dynamics, workcell simulation, and system-level digital twins.
+  - **Multi-Physics Composition**: Verified specialist pipelines for FSI, CHT, thermo-elasticity, and other coupled problems (enabled by frameworks like preCICE in Phase 2+).
+  - **Energy & Advanced Systems**: High-impact applications in fusion/plasma modeling, nuclear, and complex energy systems.
+  - **Quantum-Hybrid & Emerging Domains**: Surrogates for quantum-informed or hybrid classical-quantum problems.
+  - **Long-Term Foundational Physics Models**: The compounding Landscape Agent and Specialist Bank create a path toward generalizable, trustworthy physics models.
 
-## How It Works (Core Design)
-
-Hydrogen’s architecture rests on several interlocking principles:
-
-### 1. Multi-Objective Physics-Gated Scoring
-Every submission is scored across three high-level objectives:
-
-- **Physics Fidelity** (45%) — residuals, conservation, boundary conditions, stability
-- **Robustness** (30%) — performance under hidden stress and long-term rollout
-- **Accuracy** (25%) — benchmark / hold-out performance
-
-Only strategies that beat the current best **combined score** on a challenge receive meaningful weight. Everything else is heavily discounted.
-
-### 2. ChallengeWinnerTracker (Per-Challenge Leader Tracking)
-Inspired by Minos-style round-only winner logic but extended across multiple challenges:
-
-- Tracks the best combined score **per challenge**
-- Applies exponential decay on old performance
-- Produces winner-heavy + participation dust weight distributions
-- Only genuine new leaders (on the combined physics + robustness + accuracy metric) drive emissions
-
-### 3. Decentralized Strategy Discovery
-Miners/agents propose training strategies (backbones, loss weights, curricula, architectures, etc.). The network adversarially evaluates them under hidden conditions. Better strategies rise. The Landscape Agent extracts causal insights and improves priors over time.
-
-### 4. Information Asymmetry (Anti-Gaming)
-Miners and agents see challenge descriptions, their own scores, and noisy/aggregated priors — but **not** the hidden stress conditions, exact physics gate implementations, or full internal scoring logic. This asymmetry is intentional and core to robustness.
-
-### 5. Reusable Specialists & Composition (Future)
-Over time, high-performing strategies are distilled into reusable ONNX specialists with validity domains. These can be composed into multi-physics pipelines. The Specialist Bank + data royalty model creates a flywheel of reusable, verified components.
+The **Landscape Agent** turns every submission into compounding intelligence — extracting symbolic features and causal insights (via Double Machine Learning) to improve priors and drive better future discoveries. This creates network effects and a growing moat through the Specialist Bank and data royalties.
 
 ---
 
-*Hydrogen is an experiment in decentralized, physics-constrained scientific discovery. The goal is not just better surrogates — it is a new way to explore and encode physical knowledge at scale.*
+## The Core Agentic Loop
+
+Miners and agents interact through **MCP** (with persistent sessions, streaming validation, and easy local/remote testing). They submit strategies, receive detailed feedback from hidden adversarial validation, and benefit from improving priors generated by the Landscape Agent. This closed loop enables rapid iteration while maintaining rigorous standards.
+
+---
+
+## Key Design Principles & Why They Matter
+
+**MCP + Agent-Friendly Design with Built-in Testing Loop**  
+Making participation seamless for agents (with built-in testing and fast feedback) dramatically increases the speed and diversity of strategy exploration. Agents can iterate quickly without heavy infrastructure overhead.
+
+**Hidden Adversarial Validation Mechanism**  
+Strategies are evaluated under hidden stress conditions with hard physics gates (conservation, stability, boundaries) and continuous scoring on Physics Fidelity, Robustness, and Accuracy. This creates trustworthy robustness that is extremely difficult to game, while still providing actionable diagnostics for improvement.
+
+**Information Asymmetry**  
+Miners/agents see their scores and useful feedback but not the exact hidden stress conditions or internal gate logic. This prevents targeted overfitting while preserving learning signals.
+
+**Landscape Agent – Symbolic & Causal Knowledge Compounding**  
+The Landscape Agent ingests evaluation results (including stress performance and symbolic features from PySR/ModelingToolkit), applies Double Machine Learning to understand causal effects of strategy choices, and builds an evolving knowledge base. This compounds intelligence over time — better priors lead to better strategies, which generate even richer data. It is the engine that turns individual submissions into collective, accelerating progress.
+
+**Determinism & Reproducibility**  
+Full hierarchical seeding, framework-level controls, and auditability ensure every evaluation is reproducible and trustworthy across validators. This is essential for credible robustness claims and dispute resolution.
+
+**Incentive Alignment (ChallengeWinnerTracker)**  
+Only genuine improvements on the combined physics + robustness + accuracy metric drive meaningful rewards, with exponential decay to keep the system dynamic and focused on continuous progress.
+
+**Specialist Composition for Multi-Physics**  
+High-performing strategies are distilled into reusable specialists that can be composed (e.g., via preCICE) for complex real-world problems. This scales the system from single-physics to coupled multi-physics applications.
+
+---
+
+## Current State & Roadmap
+
+Phase 0 foundations (scoring, stress testing, determinism, MCP basics, tracker) are in place or advancing rapidly. Phase 1 adds customization, Abaqus ingestion, and expanded symbolic capabilities. Phase 2 brings verified multi-physics composition with preCICE. Phase 3 expands to 3D and more advanced composition.
+
+See `SPEC.md` and `docs/FUTURE_DOMAINS.md` for full technical and market details.
+
+---
+
+## Getting Started
+
+```bash
+git clone https://github.com/jbequ5/Hydrogen.git
+cd Hydrogen
+# Run validator in dry-run mode to explore
+python neurons/validator.py --dry_run true
+```
+
+See the docs folder for detailed guides.
+
+---
+
+## Contributing
+
+Contributions in stress testing, determinism, symbolic integration, MCP enhancements, and multi-physics composition are especially welcome.
+
+---
+
+*Hydrogen is building the decentralized agentic infrastructure for trustworthy, compounding physical intelligence.*
