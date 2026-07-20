@@ -56,7 +56,7 @@ Every submission goes through a rigorous, hidden validation process:
   - Physics Fidelity (45%): Residuals, conservation laws, boundary conditions, stability.
   - Robustness (30%): Performance under hidden stress, long-term rollout, generalization.
   - Accuracy (25%): Benchmark/hold-out performance.
-  Only strategies that set a new best *combined score* on a challenge receive meaningful weight.
+ Only strategies that set a new best *combined score* on a challenge receive meaningful weight.
 
 This combination ensures surrogates are not just accurate on known data but genuinely robust and physically trustworthy under unseen conditions.
 
@@ -80,6 +80,7 @@ Future phases add a hybrid model with Breakthrough Bounties (for record-setting 
 ---
 
 ## Why This Design Matters
+
 The space for AI-powered physics simulation and Neural Operators is still nascent. There is a tremendous amount left to discover in *how* to best build, train, and use these models for real engineering problems.
 
 A properly aligned decentralized subnet like Carbon has a real chance to outperform centralized players (Neural Concept, PhysicsX, Dyad, etc.) — and do it for cheaper — by enabling massively parallel strategy exploration with strong selection pressure from hidden adversarial stress testing. Centralized teams explore this space linearly; Carbon explores it in parallel across thousands of strategies.
@@ -95,7 +96,18 @@ This combination of decentralized exploration, rigorous hidden testing, and comp
 
 ---
 
+## Competitive Positioning
+
+The broader industry is moving rapidly toward **Software Defined Machines** and **Living Digital Twins** — where models serve as the single source of truth across design, embedded control, deployment, and ongoing operation, continuously refined by real-world data. Leading efforts such as JuliaHub’s Dyad platform are building modern acausal modeling environments, SciML-powered surrogates, generative AI assistance, and cloud-native workflows to make this vision practical for industrial engineering.
+
+**Carbon occupies a distinct and complementary role**: while these platforms focus on making high-quality modeling and surrogate generation accessible and integrated, Carbon is the **decentralized discovery and robustness engine** that finds superior Neural Operator training methodologies, validates them under hidden adversarial stress with physics gates, and compounds that knowledge across the network via the Landscape Agent. This makes the surrogates produced for Software Defined Machines and Living Digital Twins more trustworthy, robust, and performant — especially for safety-critical and regulated applications.
+
+In short: Dyad and similar platforms modernize the modeling *environment*; Carbon discovers the *best ways* to train and validate the physics-informed surrogates that power the next generation of digital twins.
+
+---
+
 ## Current State & Roadmap
+
 Phase 0 foundations (scoring, stress testing across all physics classes, determinism utilities, MCP basics, symbolic skeleton, full integration of stress into scoring) are advancing rapidly. Phase 1 adds customization, Abaqus ingestion, and deeper symbolic/causal capabilities. Phase 2 brings verified multi-physics with preCICE. Phase 3 expands to 3D and more advanced composition.
 
 See `SPEC.md`, `docs/FUTURE_DOMAINS.md`, and other docs in the repository for full technical details.
