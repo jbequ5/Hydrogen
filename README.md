@@ -40,6 +40,42 @@ The **Landscape Agent** and Specialist Bank create a compounding moat by continu
 
 ---
 
+## Validator & Miner Workflows (Upgraded Design)
+
+Carbon’s validator and participation layer are deliberately engineered to maximize both **scientific rigor** and **agent/miner productivity**.
+
+### Validator Workflow
+The validator runs in a reproducible Docker container and accepts structured strategy JSON. It dynamically selects the correct neural operator backbone, assembles a deterministic data mixture, trains the model, and evaluates it through a **multi-fidelity pipeline**:
+
+- **Tier 1 (Fast Filter)**: Low-cost stress testing quickly eliminates weak strategies.
+- **Tier 2 (Full Evaluation)**: Only promising candidates proceed to full hidden stress testing with physics gates.
+
+During training, the validator performs **online physics residual monitoring** with configurable adaptive responses (such as dynamic loss re-weighting within defined bounds). Every run automatically generates a rich **Model Card** containing the exact strategy configuration, training dynamics, held-out metrics, stress results, gate violations with physics explanations, and extracted symbolic features. These cards feed the Landscape Agent and provide strong auditability and provenance.
+
+This design delivers high throughput while preserving the adversarial strength of hidden stress testing.
+
+### Miner & Agent Workflow (MCP)
+The MCP layer supports multiple modes so both human miners and autonomous agents can iterate rapidly while receiving **genuine, physics-constrained feedback**:
+
+- **Light Training + Gated Evaluation** (recommended test mode): Reduced training budget followed by held-out evaluation + hidden stress testing + **full physics gates**. Produces a real test score quickly. Does not affect the official leaderboard but is logged and can contribute (with lower weight) to the Landscape Agent.
+- **Simulated / Cached Approximation**: For very early prototyping.
+- **Full Production Submission**: Complete training + full adversarial stress testing. Only these submissions can set new best combined scores and earn strong emissions weight.
+
+Additional capabilities include:
+- **Prior-Informed Warm Starts** from the Landscape Agent (using current best priors or distilled specialists).
+- **Explainable Failure Diagnostics** (locations and types of high residuals or gate violations, spectral issues, uncertainty hotspots, and comparisons to recent successful strategies).
+- **Pareto / Multi-Objective Reporting** in test mode (optional) to surface interesting trade-offs.
+
+All runs remain fully deterministic. Test modes are rate-limited and clearly separated from production submissions. This combination enables fast, high-signal iteration without compromising the subnet’s adversarial integrity or incentive alignment.
+
+**Why These Design Choices Matter**:
+- They dramatically increase iteration speed for both humans and autonomous agents.
+- They generate richer data for the Landscape Agent, accelerating collective intelligence.
+- They maintain strong defensibility through determinism, provenance, physics gates, and clear separation of test vs. production paths.
+- They position Carbon as one of the most agent-friendly yet rigorously validated subnets, enabling faster discovery of superior Neural Operator methodologies than centralized platforms can achieve.
+
+---
+
 ## How the Engine Works — Clear Mechanism Walkthrough
 
 ### 1. Participation via MCP (Agent-Friendly with Built-in Testing Loop)
