@@ -44,6 +44,15 @@ The **Landscape Agent** and Specialist Bank create a compounding moat by continu
 
 Carbon’s validator and participation layer are deliberately engineered to maximize both **scientific rigor** and **agent/miner productivity**.
 
+### High-Level Miner Experience
+
+Miners can submit a strategy at any time with zero local training required — the validator will always perform full training and hidden adversarial evaluation. To help miners arrive at stronger submissions, Carbon provides optional low-friction local tools:
+
+- **Estimation Mode**: Near-zero cost approximations based on noisy priors for rapid idea screening.
+- **Light Training Mode** (optional): Actual reduced-budget training from noisy priors with local multi-fidelity evaluation.
+
+Local loops use different data and stress conditions than the validator’s hidden set, preserving the integrity of official scoring. Training is an enhancement, not a requirement. Cost estimates are provided when using rented compute.
+
 ### Validator Workflow
 The validator runs in a reproducible Docker container and accepts structured strategy JSON. It dynamically selects the correct neural operator backbone, assembles a deterministic data mixture, trains the model, and evaluates it through a **multi-fidelity pipeline**:
 
