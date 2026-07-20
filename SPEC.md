@@ -1,6 +1,6 @@
 # SPEC.md — Carbon PDE Subnet Technical Specification (Buildable Level with Strategic Emphasis)
 
-**Version:** 4.5 (Updated July 2026)
+**Version:** 4.6 (Updated July 2026) — **Upgraded Validator & MCP Workflows**
 **Audience**: Researchers and engineers with PhD-level background in Physics, Computational Mechanics, or Scientific Computing.
 
 This specification provides sufficient detail for a domain expert to understand the scientific rationale, implementation logic, and expected behavior of every major component. It is intended to be buildable and scientifically defensible.
@@ -11,186 +11,133 @@ This specification provides sufficient detail for a domain expert to understand 
 
 High-fidelity simulation remains the bottleneck in engineering design, optimization, digital twins, and real-time control. Traditional solvers scale poorly with design space size or real-time requirements. Pure data-driven ML surrogates are fast but frequently violate conservation laws, stability conditions, or boundary physics, rendering them unreliable for downstream engineering use.
 
-The space for AI-powered physics simulation and Neural Operators is still **nascent**. There is a tremendous amount left to discover in *how* to best build, train, and use these models for real engineering problems (loss formulations, curricula, conditioning, robustness under distribution shift, multi-physics coupling, long-horizon stability, etc.).
+The space for AI-powered physics simulation and Neural Operators is still **nascent**. There is a tremendous amount left to discover in *how* to best build, train, and use these models for real engineering problems.
 
-Centralized teams explore this space linearly and with limited internal testing. Carbon is designed to explore it in parallel across thousands of strategies with strong selection pressure from hidden adversarial validation.
+Centralized teams explore this space linearly. Carbon is designed to explore it in parallel across thousands of strategies with strong selection pressure from hidden adversarial validation and compounding knowledge via the Landscape Agent.
 
-**Core Thesis**: A properly aligned decentralized subnet can discover superior Neural Operator training methodologies faster and cheaper than centralized players, while gaining significant credibility through trustless, verifiable stress testing.
-
-Carbon addresses this by creating a **decentralized, adversarially validated, self-improving engine** for physics-informed neural operator strategies. Key scientific and strategic advantages:
-
-- Adversarial hidden stress testing forces robustness beyond public benchmarks.
-- Hard physics gates enforce non-negotiable physical constraints.
-- The Landscape Agent extracts symbolic structure and causal relationships, enabling compounding knowledge.
-- Determinism and auditability ensure scientific reproducibility and trust.
-- Decentralized parallel exploration replaces centralized linear search.
-
-The system is designed so that a domain expert can verify that submitted strategies are not merely fitting data but are learning physically meaningful operators.
+**Core Thesis**: A properly aligned decentralized subnet can discover superior Neural Operator training methodologies faster and cheaper than centralized players, while providing trustless, verifiable robustness.
 
 ---
 
-## 2. Validator Docker Image, Backbone Selection, Training, and Evaluation Pipeline
+## 2. Validator Docker Image, Backbone Selection, Training, Evaluation & Advanced Features
 
-### 2.1 Purpose and Design Goals
-The validator runs inside a hardened Docker container that provides a fully reproducible environment for:
-- Accepting strategy configurations as JSON.
-- Dynamically selecting and instantiating the correct neural operator backbone.
-- Executing deterministic training on the appropriate data mixture.
-- Running hidden stress tests and physics gates.
-- Evaluating on held-out benchmark data.
-- Producing auditable, reproducible results and artifacts.
+### 2.1 Strategy JSON Schema (Input Contract)
+Miners submit strategies as structured JSON. The validator must parse this to select backbone, configure training, data mixture, and evaluation behavior.
 
-This design ensures that any validator can exactly reproduce another validator’s training, stress testing, and scoring outcomes (within numerical tolerance), which is essential for trust, auditability, and defensibility of the subnet.
+Key extensible fields include `backbone`, `training` (optimizer, lr_schedule, loss_weights, curriculum, data_mixture), `conditioning`, and `uncertainty`.
 
-### 2.2 Strategy JSON Schema (Input Contract)
-Miners and agents submit strategies as structured JSON with the following top-level keys (extensible in later phases):
+### 2.2 Backbone Registry & Dynamic Instantiation
+The Docker image contains a Backbone Registry. Upon receiving JSON, the validator looks up the backbone type, instantiates it with provided config, applies conditioning/uncertainty modules, and seeds weights deterministically.
 
-```json
-{
-  "strategy_id": "unique-hash-or-uuid",
-  "backbone": {
-    "type": "FNO" | "DeepONet" | "U-Net" | "GraphNO" | "PINO" | "Custom",
-    "config": { ... }   // architecture-specific hyperparameters
-  },
-  "training": {
-    "optimizer": "AdamW" | "LBFGS" | ...,
-    "lr_schedule": {...},
-    "epochs": 100,
-    "batch_size": 32,
-    "loss_weights": { "pde_residual": 1.0, "boundary": 0.5, ... },
-    "curriculum": { "type": "progressive" | "self_paced" | "fixed", "params": {...} },
-    "data_mixture": {
-      "procedural_weight": 0.7,
-      "well_slices_weight": 0.2,
-      "custom_dataset_weight": 0.1
-    }
-  },
-  "conditioning": { ... },           // e.g., FiLM, hypernetwork, or parameter embedding
-  "uncertainty": { "type": "evidential" | "ensemble" | "none" },
-  "metadata": { "description": "...", "tags": [...] }
-}
-```
+### 2.3 Data Pipeline & Deterministic Training
+The validator builds a seeded data pipeline from the `data_mixture`:
+- Procedural data generated on-the-fly via seeded generators.
+- The Well slices sampled deterministically.
+- Custom datasets (Phase 1+) loaded with seeded loaders.
 
-The validator validates the JSON against a schema and rejects malformed submissions.
+Training executes with full hierarchical seeding for reproducibility. Loss formulation, curriculum, and optimizer follow the JSON exactly.
 
-### 2.3 Backbone Registry and Dynamic Selection
-The container includes a **Backbone Registry** (Python module with registration decorators). Supported backbones in Phase 0/1 include:
-- Fourier Neural Operator (FNO) variants
-- DeepONet and variants
-- U-Net / ResNet-based operators
-- Graph Neural Operators
-- Physics-Informed Neural Operators (PINO) with hard/soft constraint options
-- Custom / user-defined (via LoRA or plugin interface in later phases)
+### 2.4 Held-Out Evaluation + Hidden Stress + Physics Gates
+After training:
+1. Evaluate on official held-out benchmark data.
+2. Generate fresh `StressTestSet` (seeded).
+3. Run model on all stress variants.
+4. Apply hard/soft physics gates.
+5. Compute final 45/30/25 score via HydrogenScorer.
 
-Upon receiving the JSON, the validator:
-1. Looks up the backbone type in the registry.
-2. Instantiates the model with the provided `config`.
-3. Applies any conditioning or uncertainty modules specified.
-4. Moves the model to the correct device with deterministic seeding.
+Only strategies improving the current best combined score receive strong weight.
 
-This registry pattern allows easy extension of new backbones without changing core validator logic.
+### 2.5 Multi-Fidelity Evaluation Pipeline (New — Phase 0+)
+To improve throughput while preserving adversarial signal:
+- **Tier 1 (Cheap)**: Low-fidelity stress (fewer variants, lower resolution or reduced rollout length). Quick filter.
+- **Tier 2 (Full)**: Only strategies passing Tier 1 thresholds proceed to full hidden stress testing.
 
-### 2.4 Data Pipeline and Training Execution
-The validator constructs a deterministic data pipeline based on the `data_mixture` in the JSON:
+Thresholds and tier definitions are challenge-specific and versioned. This enables significantly more parallel strategy exploration without weakening the core adversarial mechanism.
 
-- **Procedural Data**: Generated on-the-fly using the seeded `ProceduralStressGenerator` (or challenge-specific data generator) for the current challenge. Parameters are derived from the master seed + strategy_id.
-- **The Well Slices**: Deterministically sampled relevant dataset slices (mapped to physics class) with physics-preserving augmentations.
-- **Custom Datasets** (Phase 1+): Loaded from approved sources (Abaqus ODB/.fil, user-uploaded with validation) using seeded data loaders.
+### 2.6 Uncertainty-Aware Stress Prioritization (New — Phase 1+)
+When the backbone supports uncertainty (evidential outputs or ensemble mode), the validator can prioritize or re-weight stress variants where epistemic uncertainty is high. This focuses adversarial pressure on the regions where the model is least confident, representing a more sophisticated form of robustness testing.
 
-Training loop:
-- Fully deterministic (hierarchical seeding for weight init, data order, dropout, augmentation).
-- Uses the loss formulation and weights from the JSON.
-- Curriculum strategy executed as specified.
-- Optimizer and learning rate schedule applied exactly as configured.
-- Intermediate checkpoints and metrics logged with hashes for auditability.
-- Early stopping or convergence criteria can be defined in the JSON (with safeguards).
+### 2.7 Online Physics Residual Monitoring + Adaptive Behavior (New — Phase 0+)
+During training, the validator monitors PDE residuals and conservation metrics in real time. Configurable behaviors include:
+- Dynamic loss weight adjustment (within JSON-defined bounds).
+- Early stopping on persistent physics violations.
+- Logging of residual trajectories for the Landscape Agent.
 
-All random operations inside training are controlled so that two validators running the identical JSON on the same challenge produce bitwise-identical model weights (within floating-point tolerance) and identical training curves.
+This makes training itself more physics-aware and supports discovery of robust training dynamics.
 
-### 2.5 Held-Out Benchmark Evaluation + Hidden Stress Testing
-After training completes:
+### 2.8 Automated Strategy Provenance & Model Card Generation (New — Phase 0+)
+Every submission (test or production) automatically generates a structured **Model Card** containing:
+- Exact strategy JSON and version.
+- Backbone, hyperparameters, data mixture, loss weights, curriculum.
+- Training curves (hashed).
+- Held-out metrics.
+- Stress test summary + gate violation details (with physics explanations where possible).
+- Key symbolic features extracted.
+- Uncertainty/robustness statistics.
 
-1. **Held-Out Benchmark Evaluation**:
-   - The model is evaluated on the official held-out split for the challenge (publicly known data, never seen during training).
-   - Metrics: relative L2, max error, and any physics-specific benchmarks.
+These cards are logged, versioned, and fed to the Landscape Agent. They dramatically improve auditability and collective intelligence.
 
-2. **Hidden Stress Testing**:
-   - The validator generates a fresh `StressTestSet` using the deterministic `ProceduralStressGenerator` + Well slices (seeded from challenge + validator hotkey + run_id).
-   - The trained model is rolled out on every stress variant.
-   - Hard and soft physics gates are applied.
-   - Per-variant metrics + aggregate robustness score are computed.
-
-3. **Final Scoring**:
-   - The HydrogenScorer combines held-out accuracy, physics fidelity (from residuals/gates), and robustness (from hidden stress) using the 45/30/25 weighting.
-   - Only strategies that improve the current best combined score on this challenge receive strong weight in the ChallengeWinnerTracker.
-
-All outputs (metrics JSON, model checkpoint hash, gate violation details, stress variant results) are logged and made available for auditing.
-
-### 2.6 Docker Image Implementation Notes
-- The image contains the full registry of backbones, data generators, stress generators, scorer, and reproducibility harness.
-- Strategy JSON is accepted via MCP endpoint or mounted volume (for local testing).
-- Training can be GPU-accelerated inside the container with proper device seeding.
-- Resource limits and timeouts are enforced to prevent runaway jobs.
-- Image is version-pinned; updates require governance and rebuild.
-
-This design makes the validator a self-contained, executable specification of the entire evaluation pipeline.
+### 2.9 Docker Implementation
+The image is self-contained with the full registry, data generators, stress system, scorer, reproducibility harness, and model card generator. Strategy JSON can be submitted via MCP or mounted volume. The container enforces determinism and produces reproducible artifacts.
 
 ---
 
-## 3. Agent-Friendly MCP Mining Loop, Internal Testing, and Strategy Validation
+## 3. Agent-Friendly MCP Mining Loop, Internal Testing & Advanced Features
 
-### 3.1 Overview and Innovation Goals
-The MCP layer is designed to be highly agent-friendly while remaining scientifically and incentive-defensible. A key innovation is that **even "test" runs are meaningful**: they involve actual (light or simulated) training, are gated by physics constraints, evaluated under stress, and scored. This provides real signal to agents without compromising the adversarial nature of full production submissions.
+### 3.1 Testing Philosophy
+Even "test" runs should provide **real signal**. Therefore, test modes involve actual (light) training followed by gated evaluation under stress. This enables fast, meaningful iteration for both human miners and autonomous agents without compromising scientific integrity.
 
-### 3.2 Strategy Testing Modes in MCP
-Agents can request different testing modes via MCP. All modes still execute real training + evaluation pipelines (no pure simulation without training unless explicitly requested for very early prototyping).
+### 3.2 Testing Modes
 
-**Mode 1: Light Training + Full Evaluation (Recommended for most testing)**
-- Reduced training budget (e.g., 20-40% of full epochs, smaller batch size, or accelerated curriculum).
-- Same backbone, loss formulation, and data mixture as the production JSON.
-- After light training, the model undergoes:
-  - Held-out benchmark evaluation.
-  - Hidden stress testing (can be on a reduced but still challenging subset of variants for speed, or full set with early stopping).
-  - Full physics gate application (hard gates still zero the score on critical violations).
-- Produces a **test score** (same 45/30/25 formulation) that is returned quickly to the agent.
-- This test score does **not** update the main leaderboard but is logged and can optionally contribute (with lower weight) to the Landscape Agent for prior improvement.
+**Mode A: Light Training + Gated Evaluation (Default Recommended Mode)**
+- Reduced training budget (e.g. 25-40% epochs or accelerated curriculum).
+- Same backbone, loss formulation, and data mixture as specified.
+- After training: held-out evaluation + hidden stress testing (can use reduced variant set for speed) + **full physics gates**.
+- Produces a real test score using the 45/30/25 formulation.
+- Does **not** update the main leaderboard but is logged and can contribute (lower weight) to the Landscape Agent.
 
-**Mode 2: Simulated / Cached Training Approximation (Early prototyping only)**
-- For very rapid iteration, agents can request a simulated run that re-uses cached training dynamics or fast approximations (e.g., linear response around a known good model or reduced-order surrogate of the training process).
-- Still applies the same stress testing and physics gates on the resulting approximate model.
-- Clearly marked as "simulated" in results and given lower trust weight by the Landscape Agent.
-- Useful for hyperparameter sweeps or architecture search before committing to light or full training.
+**Mode B: Simulated / Cached Approximation (Early Prototyping)**
+- Uses fast approximations or cached training dynamics.
+- Still applies stress testing and physics gates.
+- Clearly labeled as simulated; given lower weight by the Landscape Agent.
 
-**Mode 3: Full Production Submission**
-- Complete training budget as specified in the JSON.
-- Full hidden stress testing on the complete StressTestSet.
-- Full physics gates and scoring.
-- Only these submissions can set new best combined scores and earn strong emissions weight.
+**Mode C: Full Production Submission**
+- Complete training + full hidden stress + gates.
+- Only these can set new best combined scores and earn strong emissions weight.
 
-### 3.3 Defensibility and Anti-Gaming Design
-- **Clear Separation of Concerns**: Test modes (1 and 2) never affect the official leaderboard or primary emissions. Only full production submissions do.
-- **Meaningful Signal in Testing**: Because light training + stress/gates still occurs, agents receive genuine feedback on whether their strategy is promising. This prevents wasted full submissions on obviously broken ideas.
-- **Rate Limiting & Credit System**: Each agent/hotkey has a limited number of test-mode runs per epoch or per challenge. Production submissions may have higher cost or staking requirements.
-- **Determinism**: All test and production runs are fully deterministic and reproducible inside the validator Docker image.
-- **Provenance & Auditing**: Every test and production run logs the exact JSON, seeds used, training curves (hashed), stress results, and gate outcomes.
-- **Phased Difficulty in Testing**: Early test modes can use easier stress variants or fewer variants while still applying hard physics gates. This gives fast feedback while preserving the adversarial character of the main evaluation.
-- **Landscape Agent Integration**: Even test runs can feed the Landscape Agent (with appropriate weighting), turning every agent interaction into collective intelligence.
+### 3.3 Prior-Informed Warm Start from Landscape Agent (New — Phase 1+)
+In test mode (and optionally production), agents can request initialization from the current best priors or distilled specialist weights for the challenge + backbone combination. This is retrieved from the Landscape Agent’s knowledge base.
 
-### 3.4 Benefits for SOTA and Innovative Strategies
-This design strongly supports the development of state-of-the-art and innovative strategies:
+This dramatically accelerates discovery and directly leverages the compounding intelligence of the subnet.
 
-- Autonomous agents can implement closed-loop optimization (e.g., Bayesian optimization, evolutionary search, or reinforcement learning over strategy JSON space) using the fast but meaningful test-mode feedback as a reward signal.
-- Human miners can rapidly prototype novel loss formulations, curricula, conditioning schemes, or backbone modifications and receive gated, stress-tested scores within minutes instead of hours.
-- The combination of light-but-real training + adversarial stress testing in test mode creates a high-signal environment that rewards genuine innovation rather than benchmark overfitting.
-- Because test results are still physics-gated and stress-evaluated, the subnet maintains scientific integrity even during rapid agent-driven exploration.
+### 3.4 Explainable Failure Diagnostics (New — Phase 0+)
+Test and production runs return rich, interpretable diagnostics in addition to scores:
+- Locations and types of high residual or gate violations (e.g., "shock capturing failure in high-frequency region").
+- Spectral or conservation drift analysis where applicable.
+- Uncertainty hotspots (if uncertainty module is active).
+- Comparison against recent successful strategies on similar challenges.
 
-### 3.5 MCP Implementation Notes
-- MCP exposes endpoints for submitting JSON strategies in different modes (test_light, test_simulated, production).
-- Streaming of intermediate training metrics, gate status, and final scores is supported for long-running jobs.
-- Persistent sessions allow agents to maintain state across multiple test iterations.
-- Authentication is hotkey-based with optional higher quotas for high-performing or staked agents.
+This greatly improves iteration speed for both human miners and autonomous agents.
 
-This MCP + testing design makes Carbon one of the most agent-friendly yet rigorously defensible subnets, enabling the rapid discovery of superior Neural Operator methodologies that centralized platforms cannot easily replicate.
+### 3.5 Pareto / Multi-Objective Reporting in Test Mode (New — Phase 1+)
+Light test mode can optionally return the Pareto front across physics fidelity, robustness, and accuracy instead of (or in addition to) a single scalar score. This helps agents discover interesting trade-off strategies and provides richer data to the Landscape Agent.
+
+### 3.6 Defensibility & Anti-Gaming
+- Clear separation: Test modes never affect official leaderboard or primary emissions.
+- Rate limiting and credit system on test modes.
+- All runs (test and production) are fully deterministic and reproducible.
+- Full provenance and model card logging for every run.
+- Phased difficulty in testing while still applying hard physics gates.
+- Landscape Agent can use test data (with appropriate weighting) to improve priors.
+
+### 3.7 Benefits for SOTA Innovation
+This design strongly supports state-of-the-art strategy development:
+- Autonomous agents can run closed-loop optimization (Bayesian, evolutionary, RL) using high-signal gated test feedback.
+- Human miners can rapidly prototype novel ideas with meaningful physics-constrained feedback in minutes rather than hours.
+- The combination of light-but-real training + adversarial gated evaluation creates an environment that rewards genuine methodological innovation.
+
+### 3.8 MCP Implementation
+MCP exposes endpoints for different modes with streaming support. Persistent sessions and hotkey-based authentication are supported, with optional higher quotas for high-performing or staked agents.
 
 ---
 
@@ -208,233 +155,71 @@ This MCP + testing design makes Carbon one of the most agent-friendly yet rigoro
 | 6 | Linear Elasticity | 2D | Vector mechanics, equilibrium | Material property variation (Young's modulus, Poisson ratio), boundary displacement |
 | 7 | Thermo-Elasticity | 2D | Coupled thermal-mechanical | Thermal expansion, coupling strength, temperature loading; tests coupled conservation |
 
-Each challenge includes public training/holdout splits and hidden stress configurations. Symbolic metadata (conservation laws, symmetries, boundary types) is attached.
+Each challenge includes public training/holdout splits and hidden stress configurations. Symbolic metadata is attached.
 
 ### 4.2 Phase 1: Customization Layer
-
-Same 7 challenges + support for custom datasets (Abaqus ODB/.fil ingestion) and LoRA/custom strategy parameters. Focus remains on single-physics robustness with richer data diversity.
+Same 7 challenges + custom datasets and LoRA/custom strategy support.
 
 ### 4.3 Phase 2: Verified Multi-Physics Composition
-
-**Phase 2A — Benchmark Problems**:
-- FSI (Fluid-Structure Interaction): Turek/Hron 2D benchmarks (FSI-1/2/3). Reference: partitioned coupling via preCICE + OpenFOAM/CalculiX or equivalent. Key physics: fluid-structure interaction, added mass, vortex shedding.
-- Conjugate Heat Transfer (CHT): Solid-fluid thermal coupling (electronics cooling, heat exchangers). Reference solutions from PDEBench/OpenFOAM.
-
-**Phase 2B — Thermo-Elasticity Reference Suite**:
-Generate ~48 mesh-converged Tier-1 reference cases at 256^{2} using FEniCS monolithic solver, varying thermal expansion coefficient (β), conductivity (κ), and geometry. Cost target: moderate compute for ground truth.
-
-**Phase 2C — Variant Expansion**:
-New Reynolds numbers, geometries, coupling strengths on the above. Three-track leaderboard (Monolithic / Composition / Specialist-Only).
+FSI (Turek/Hron), CHT, and expanded Thermo-Elasticity with preCICE and reference solutions.
 
 ### 4.4 Phase 3: 3D Multi-Physics & Advanced Composition
-
-- 3D FSI (cylinder/flap with turbulence)
-- 3D Thermo-Elasticity (bimetal, engine, turbine components)
-- 3D CHT (electronics, battery, turbine cooling)
-
-Requires 3D turbulence bridge (proper Kolmogorov spectrum initialization, not simple zero-pad), 3D-specific gates (energy spectrum, Q-criterion, wall shear, Nusselt distribution), and curriculum from 2D specialists.
-
-Reference solutions: preCICE partitioned, FEniCS/OpenFOAM monolithic where appropriate.
+3D FSI/CHT/Thermo-elasticity with turbulence, 3D-specific gates, and curriculum from 2D specialists.
 
 ---
 
 ## 5. Validation Strategy — Scientific Rigor & Competitive Edge
 
-### 5.1 Multi-Objective Scoring (45/30/25)
-
-Final combined score = w_p · PhysicsFidelity + w_r · Robustness + w_a · Accuracy, with w = [0.45, 0.30, 0.25].
-
-Only new best combined scores on a challenge receive strong weight from the ChallengeWinnerTracker.
-
-**Physics Fidelity (45%)**:
-- Residual norms (PDE residual, divergence error for incompressible flow)
-- Conservation errors (mass, momentum, energy)
-- Boundary condition satisfaction (relative L2 or max norm)
-- Stability metrics (energy growth/decay rates, rollout stability)
-
-**Robustness (30%)**:
-- Performance degradation under hidden stress (procedural + data-driven)
-- Long-horizon rollout stability
-- Generalization across parameter variations and out-of-distribution slices
-
-**Accuracy (25%)**:
-- Hold-out / benchmark error (relative L2, max error)
-
-### 5.2 Physics Gates (Enforcement Layer)
-
-**Hard Gates** (score = 0 on violation — non-negotiable physical constraints):
-- Mass conservation: ‖∇·u‖ / ‖u‖ < threshold (typically 1e-3)
-- Energy dissipation/stability: |dE/dt| or long-term energy drift below threshold
-- Boundary satisfaction: relative error on Dirichlet/Neumann conditions
-- Rollout stability: bounded energy growth over long horizons
-- UQ calibration (when applicable)
-
-Phase-field specific: crack irreversibility (∂d/∂t ≥ 0), length-scale consistency, valid degradation function.
-
-**Soft Gates** (multiplicative penalty):
-- Symmetry violation, spectral fidelity, conservation drift (graded penalties).
-
-These gates are designed so that a PhD-level reviewer can verify they correspond to fundamental physical requirements of the PDE class.
-
-### 5.3 Hidden Stress Testing (Adversarial Robustness — Core Moat)
-
-Stress is generated per physics class with explicit scientific justification. Number of variants and parameter ranges scale with difficulty. All variants carry `physics_justification` metadata.
-
-**Elliptic (Poisson/Darcy)**:
-- Source amplitude & spatial variation (tests maximum principle & conservation)
-- Boundary condition strength/type variation
-- Coefficient field regularity (smooth → discontinuous; tests solution regularity)
-
-**Hyperbolic (Burgers)**:
-- Shock strength (initial condition steepness)
-- High-frequency perturbation amplitude (tests shock capturing & stability)
-- Rollout horizon length (long-time behavior after shock formation)
-- Viscosity variation (within physically relevant range)
-- Initial condition noise
-
-**Parabolic (Heat)**:
-- Time-dependent forcing amplitude & frequency
-- Conductivity field variation
-- Rollout length (long-term decay)
-- Initial condition roughness
-
-**Incompressible Flow (NS laminar)**:
-- Reynolds number (laminar regime)
-- Geometry scale/perturbation
-- Boundary condition perturbation
-- Initial vorticity noise
-- Weak body forcing
-
-**Elasticity**:
-- Young's modulus variation
-- Poisson ratio range
-- Boundary displacement magnitude
-- Material anisotropy
-- Body force strength
-
-**Thermo-Elasticity (Multi-physics)**:
-- Thermal expansion coefficient
-- Thermo-mechanical coupling strength
-- Temperature loading amplitude
-- Mechanical damping
-- Deformation-induced heat source strength
-
-**Difficulty Scaling**: Higher difficulty increases number of variants, range of parameter excursions, and rollout lengths while remaining physically plausible.
-
-**Data-Driven Stress (The Well)**: Relevant dataset slices (turbulence, viscoelastic, active matter, acoustic scattering, etc.) mapped to physics class. Physics-preserving augmentations applied where possible.
-
-**Strategic Advantage**: Hidden adversarial stress testing is extremely difficult for centralized platforms to match at scale. It forces genuine robustness and provides verifiable, trustless evaluation — a major credibility advantage for engineering and regulated applications.
-
-See `docs/STRESS_TEST_DESIGN.md` and current `neurons/stress/procedural_generator.py` for exact parameter ranges and justification strings.
+Multi-objective scoring (45/30/25), hard/soft physics gates, and hidden stress testing as previously defined. Multi-fidelity and uncertainty-aware extensions (Sections 2.5–2.6) enhance throughput and sophistication without weakening adversarial guarantees.
 
 ---
 
-## 6. Determinism & Reproducibility (Scientific Trust & Credibility Moat)
-
-Every evaluation must be reproducible given only public inputs + validator identity. Hierarchical seeding + framework controls achieve this.
-
-Master seed derived from challenge_id + validator hotkey. Sub-seeds control data loading, augmentation, training, stress generation, and scoring.
-
-PyTorch determinism flags + environment provenance recording enable cross-validator verification. A Reproducibility Harness compares scores, key tensors (within tolerance), and gate outcomes.
-
-**Strategic Importance**: This level of determinism is required for credible claims of robustness and for audit/dispute resolution. It provides a trustless verification layer that centralized "black-box" AI platforms struggle to match, especially in safety-critical or regulated domains.
+## 6. Determinism & Reproducibility
+Hierarchical seeding, framework controls, and Docker-based reproducibility harness ensure all training, stress testing, and scoring (including multi-fidelity tiers) are reproducible and auditable.
 
 ---
 
-## 7. Landscape Agent — Symbolic & Causal Compounding (Core Innovation Engine)
+## 7. Landscape Agent — Symbolic & Causal Compounding
+Ingests results, model cards, and diagnostics from both production and high-quality test runs. Extracts symbolic features and applies Double Machine Learning for causal insights into effective training methodologies. Updates priors and drives specialist distillation.
 
-The Landscape Agent is the component that turns decentralized evaluation into collective intelligence — enabling Carbon to discover better *ways* to train Neural Operators.
-
-**Ingestion**: StrategyFragments containing strategy config, training metrics, full stress results (per-variant performance + gate outcomes), and symbolic features.
-
-**Symbolic Processing**: Enrichment with conservation laws, symmetries, boundary types, coupling terms (extracted via rule-based Phase 0; ModelingToolkit + PySR in later phases).
-
-**Causal Analysis**: Double Machine Learning (DML) to estimate heterogeneous treatment effects of strategy features (loss weights, backbone choice, curriculum parameters, etc.) on outcomes (combined score or robustness). This is central to discovering which training methodologies actually work.
-
-**Knowledge Compounding**: Updated priors, causal graphs, and performance history are used to generate better challenge priors and specialist candidates. This creates compounding returns on every evaluation submitted to the network.
-
-**Outputs**: Improved agent priors, specialist distillation candidates, causal insights for roadmap/challenge design, inputs to Symbolic Gauntlet.
-
-**Strategic Role**: This is how Carbon turns parallel exploration into superior methodologies faster than centralized teams. The compounding effect (better data → better insights → better strategies → richer data) is a core part of the thesis that a decentralized subnet can outperform centralized players.
-
-**Future**: Integration with multi-physics composition and Foundation Operator (LPM with FiLM conditioning, evidential UQ).
-
-See design notes for DML implementation sketch and data schemas.
+Prior-informed warm starts and model card data directly enhance the Landscape Agent’s effectiveness.
 
 ---
 
 ## 8. Detailed Implementation Components
-
-(See current code in `neurons/` for reference implementations that match the interfaces below.)
-
-**Stress Generators**: Registry-based with physics-class-specific deep implementations (parameter variation logic as described in Section 5.3).
-
-**StressEvaluator**: Runs model on StressTestSet, applies gates, returns structured results (hard failures, soft penalties, per-variant metrics, stress contribution).
-
-**HydrogenScorer**: Integrates base metrics + stress results; computes weighted scores; modulates final combined score by stress contribution.
-
-**generate_challenge()**: Deterministic function returning Challenge object with training/holdout references, stress_config, and attached SymbolicMetadata.
-
-**MCP Layer**: Handles strategy JSON submission in multiple modes (test_light, test_simulated, production), streaming results, built-in testing with light training + gated evaluation, and agent authentication (detailed in Section 3).
-
-**Backbone Registry**: Dynamic model instantiation from JSON `backbone` specification inside the validator Docker image.
+- Stress Generators & StressEvaluator (with multi-fidelity support)
+- HydrogenScorer
+- Backbone Registry (dynamic instantiation from JSON)
+- Validator Docker image (with model card generator, residual monitoring, uncertainty handling)
+- MCP layer (multi-mode testing with light training + gated evaluation, explainable diagnostics, prior warm-start support)
+- generate_challenge()
+- Reproducibility Harness
 
 ---
 
 ## 9. Phased Roadmap (Build-Level)
 
 **Phase 0**:
-- Stress generators (procedural deep per class + Well) with determinism.
-- StressEvaluator + full scoring integration.
-- Determinism utilities and reproducibility harness.
-- MCP basics + testing loop with light training + gated evaluation.
-- Symbolic extractor + PySR skeleton.
-- ChallengeWinnerTracker.
-- generate_challenge() with symbolic attachment.
-- Validator Docker image with backbone registry, JSON parsing, training pipeline, held-out + stress evaluation.
+- Core stress generators, evaluator, scorer, determinism, MCP basic testing (light training + gated evaluation)
+- Backbone registry + JSON parsing + training pipeline in Docker
+- Automated model card / provenance generation
+- Explainable diagnostics in test mode
+- Multi-fidelity evaluation pipeline (Tier 1 cheap filter + Tier 2 full)
+- Online residual monitoring + basic adaptive behavior
 
 **Phase 1**:
-- Abaqus ODB/.fil parser (mesh + field outputs: stress/strain/displacement/history).
-- CustomDataset mixing with procedural data.
-- Initial Landscape Agent (DML causal updates + symbolic enrichment).
-- Expanded determinism in data paths.
-- Enhanced MCP testing modes, credit system, and simulated training approximations.
-- LoRA / custom backbone plugin support.
+- Prior-informed warm start from Landscape Agent
+- Uncertainty-aware stress prioritization
+- Pareto / multi-objective test reporting
+- Enhanced MCP testing modes and credit system
+- LoRA/custom backbone support
 
-**Phase 2**:
-- preCICE orchestration for FSI (Turek/Hron) and CHT benchmarks.
-- Thermo-elasticity reference generation (~48 cases, mesh-converged FEniCS).
-- Specialist pipeline schema + execution.
-- Three-track leaderboard and stress testing on multi-physics problems.
-
-**Phase 3**:
-- 3D turbulence initialization (Kolmogorov spectrum) and 3D-specific gates (energy spectrum, Q-criterion, wall shear, Nu).
-- 3D FSI/CHT/Thermo-elasticity with appropriate references (preCICE, OpenFOAM, FEniCS).
-- Advanced Landscape Agent outputs and Foundation Operator foundations.
-- Full MCP production features, agent governance, and advanced testing modes.
+**Phase 2+**: preCICE multi-physics, 3D support, advanced agent features (trajectory memory, agent-proposed stress variants).
 
 ---
 
 ## 10. Scientific Defensibility & Competitive Differentiation
-
-Every stress dimension is chosen because it directly probes a fundamental physical property of the PDE class (conservation, stability, shock capturing, coupling strength, etc.). Hard gates correspond to non-negotiable physical requirements. The Landscape Agent's causal analysis provides interpretable insights into what actually improves physical fidelity and robustness. Determinism ensures results are reproducible and auditable by domain experts.
-
-**Competitive Positioning**:
-
-The broader industry is rapidly advancing toward **Software Defined Machines** and **Living Digital Twins**, where high-fidelity models serve as the single source of truth across the entire product lifecycle — from design and embedded control to ongoing operation and predictive maintenance, continuously refined by real-world sensor data. Leading platforms such as JuliaHub’s Dyad are building modern acausal modeling environments, deep SciML integration (neural surrogates, model discovery, differentiable programming), generative AI assistance, and cloud-native deployment workflows to realize this vision for industrial engineering (aerospace, automotive, energy, etc.).
-
-**Carbon plays a distinct and complementary role** in this ecosystem:
-
-- While centralized platforms focus on usability, integration, model generation, and accelerating surrogate creation within a single environment, Carbon is the **decentralized discovery and robustness engine**.
-- Carbon enables massively parallel exploration of Neural Operator training strategies across a global network of agents and miners.
-- It applies rigorous, hidden adversarial stress testing with physics-class-specific gates that centralized systems struggle to replicate at scale.
-- The Landscape Agent extracts symbolic features and causal relationships, turning individual evaluations into compounding collective intelligence about *how* to best train and validate these surrogates.
-
-This makes Carbon particularly valuable for producing surrogates that are not only fast but genuinely robust, physically trustworthy, and auditable — critical for safety-critical and regulated applications within the Software Defined Machines and Living Digital Twins paradigm.
-
-In essence: Platforms like Dyad modernize the modeling and surrogate *environment*; Carbon discovers and validates the superior *methodologies* that power higher-performing, more reliable digital twins across the network.
-
-A PhD reviewer should be able to verify that the system is not merely optimizing for benchmark scores but is enforcing and learning physically meaningful behavior while leveraging decentralized parallel exploration to innovate faster than centralized alternatives.
+Every extension (multi-fidelity, uncertainty-aware stress, residual monitoring, model cards, explainable diagnostics, prior warm starts) is designed to be scientifically grounded, reproducible, and auditable. These features strengthen Carbon’s position as the decentralized discovery and robustness engine for Software Defined Machines and Living Digital Twins, enabling faster innovation in Neural Operator methodologies than centralized platforms can achieve.
 
 ---
 
