@@ -1,4 +1,4 @@
-# SPEC.md — Hydrogen PDE Subnet Technical Specification (PhD-Level Buildable Detail)
+# SPEC.md — Carbon PDE Subnet Technical Specification (Buildable Level)
 
 **Version:** 4.1 (Updated July 2026)
 **Audience**: Researchers and engineers with PhD-level background in Physics, Computational Mechanics, or Scientific Computing.
@@ -11,7 +11,7 @@ This specification provides sufficient detail for a domain expert to understand 
 
 High-fidelity simulation remains the bottleneck in engineering design, optimization, digital twins, and real-time control. Traditional solvers scale poorly with design space size or real-time requirements. Pure data-driven surrogates are fast but frequently violate conservation laws, stability conditions, or boundary physics, rendering them unreliable for downstream engineering use.
 
-Hydrogen addresses this by creating a **decentralized, adversarially validated, self-improving engine** for physics-informed neural operator strategies. Key scientific advantages:
+Carbon addresses this by creating a **decentralized, adversarially validated, self-improving engine** for physics-informed neural operator strategies. Key scientific advantages:
 
 - Adversarial hidden stress testing forces robustness beyond public benchmarks.
 - Hard physics gates enforce non-negotiable physical constraints (mass/energy conservation, stability, boundary fidelity).
@@ -173,11 +173,13 @@ This level of determinism is required for credible claims of robustness and for 
 
 **Symbolic Processing**: Enrichment with conservation laws, symmetries, boundary types, coupling terms (extracted via rule-based Phase 0; ModelingToolkit + PySR in later phases).
 
-**Causal Analysis**: Double Machine Learning (DML) to estimate causal effects of strategy features (loss weights, backbone choice, curriculum parameters, etc.) on outcomes (combined score, robustness under stress). Heterogeneous treatment effects are particularly valuable.
+**Causal Analysis**: Double Machine Learning (DML) to estimate heterogeneous treatment effects of strategy features (loss weights, backbone choice, curriculum parameters, etc.) on outcomes (combined score or robustness).
 
 **Knowledge Compounding**: Updated priors, causal graphs, and performance history are used to generate better challenge priors and specialist candidates. This creates compounding returns on every evaluation submitted to the network.
 
-**Outputs**: Improved agent priors, specialist distillation candidates, causal insights for challenge design, inputs to Symbolic Gauntlet.
+**Outputs**: Improved agent priors, specialist distillation candidates, causal insights for roadmap/challenge design, inputs to Symbolic Gauntlet.
+
+**Future**: Integration with multi-physics composition and Foundation Operator (LPM with FiLM conditioning, evidential UQ).
 
 This component turns the decentralized evaluation process into a scientific knowledge engine.
 
@@ -199,13 +201,13 @@ This component turns the decentralized evaluation process into a scientific know
 
 ---
 
-## 7. Phased Roadmap (Build-Level with Specific Challenges & Stress)
+## 7. Phased Roadmap (Build-Level)
 
 **Phase 0**:
-- Implement stress generators with per-class parameter variation (as detailed in 3.3) + determinism.
+- Stress generators (procedural deep per class + Well) with determinism.
 - StressEvaluator + full scoring integration.
 - Determinism utilities and reproducibility harness.
-- MCP with testing loop.
+- MCP basics + testing loop.
 - Symbolic extractor + PySR skeleton.
 - ChallengeWinnerTracker.
 - generate_challenge() with symbolic attachment.
