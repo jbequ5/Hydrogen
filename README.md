@@ -2,7 +2,7 @@
 
 **Decentralized Agentic Engine for Robust Physics-Informed Neural Operator Surrogates**
 
-Carbon is a Bittensor subnet that builds a decentralized, agentic system where miners and autonomous agents collaboratively discover fast, robust, and physics-respecting training strategies for high-fidelity engineering surrogates. It combines an **MCP-powered participation layer with built-in testing loops**, a **rigorous hidden adversarial validation mechanism**, and a **Landscape Agent that compounds symbolic and causal knowledge** over time. The result is an accelerating engine that produces surrogates far more effectively than centralized labs.
+Carbon is a Bittensor subnet that builds a decentralized, agentic system where miners and autonomous agents collaboratively discover fast, robust, and physics-respecting training strategies for high-fidelity engineering surrogates. It combines an **MCP-powered participation layer with built-in testing loops**, a **rigorous hidden adversarial validation mechanism**, and a **Landscape Agent that compounds symbolic and causal knowledge** over time. The result is an accelerating engine that has a real chance to outperform centralized players in this still-nascent space.
 
 ---
 
@@ -80,12 +80,18 @@ Future phases add a hybrid model with Breakthrough Bounties (for record-setting 
 ---
 
 ## Why This Design Matters
-- **Robustness without centralization**: Hidden stress + physics gates create trustworthy evaluation at scale.
-- **Fast agent iteration**: MCP + built-in testing loop lowers barriers and dramatically speeds discovery compared to traditional centralized labs.
-- **Compounding intelligence**: The Landscape Agent turns individual effort into collective, accelerating progress via symbolic and causal knowledge.
-- **Trust & Auditability**: Full determinism (hierarchical seeding, framework controls) and reproducibility make results credible and auditable across validators — essential for domain experts and scientific credibility.
-- **Aligned incentives**: Winner-heavy tracking with decay keeps focus on continuous, genuine improvement.
-- **Compounding Moat**: The Specialist Bank and evolving knowledge base create network effects and data royalties.
+The space for AI-powered physics simulation and Neural Operators is still nascent. There is a tremendous amount left to discover in *how* to best build, train, and use these models for real engineering problems.
+
+A properly aligned decentralized subnet like Carbon has a real chance to outperform centralized players (Neural Concept, PhysicsX, Dyad, etc.) — and do it for cheaper — by enabling massively parallel strategy exploration with strong selection pressure from hidden adversarial stress testing. Centralized teams explore this space linearly; Carbon explores it in parallel across thousands of strategies.
+
+Key advantages:
+- **Hidden Adversarial Validation**: Forces genuine robustness that is extremely hard to game.
+- **Trustless & Verifiable Stress Testing**: Full determinism and reproducibility give domain experts confidence in the results — a major credibility advantage for engineering adoption.
+- **Compounding Intelligence**: The Landscape Agent turns individual discoveries into collective knowledge that improves future priors and specialist quality.
+- **Fast Agent Iteration**: MCP + built-in testing loop dramatically speeds discovery.
+- **Aligned Incentives**: Winner-heavy tracking with decay keeps focus on continuous, genuine improvement.
+
+This combination of decentralized exploration, rigorous hidden testing, and compounding knowledge gives Carbon a structural edge in this still-early field.
 
 ---
 
