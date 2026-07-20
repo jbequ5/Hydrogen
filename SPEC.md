@@ -1,8 +1,5 @@
 # SPEC.md — Carbon PDE Subnet Technical Specification (Buildable Level with Strategic Emphasis)
 
-**Version:** 4.3 (Updated July 2026)
-**Audience**: Researchers and engineers with PhD-level background in Physics, Computational Mechanics, or Scientific Computing.
-
 This specification provides sufficient detail for a domain expert to understand the scientific rationale, implementation logic, and expected behavior of every major component. It is intended to be buildable and scientifically defensible.
 
 ---
