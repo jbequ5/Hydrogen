@@ -1,6 +1,6 @@
 # SPEC.md — Carbon PDE Subnet Technical Specification (Buildable Level with Strategic Emphasis)
 
-**Version:** 4.2 (Updated July 2026)
+**Version:** 4.3 (Updated July 2026)
 **Audience**: Researchers and engineers with PhD-level background in Physics, Computational Mechanics, or Scientific Computing.
 
 This specification provides sufficient detail for a domain expert to understand the scientific rationale, implementation logic, and expected behavior of every major component. It is intended to be buildable and scientifically defensible.
@@ -249,9 +249,19 @@ See design notes for DML implementation sketch and data schemas.
 Every stress dimension is chosen because it directly probes a fundamental physical property of the PDE class (conservation, stability, shock capturing, coupling strength, etc.). Hard gates correspond to non-negotiable physical requirements. The Landscape Agent's causal analysis provides interpretable insights into what actually improves physical fidelity and robustness. Determinism ensures results are reproducible and auditable by domain experts.
 
 **Competitive Positioning**:
-- Neural Concept and PhysicsX: Excellent centralized AI platforms for design acceleration and inference.
-- Dyad (JuliaHub): Strong modern acausal modeling + surrogate training environment.
-- **Carbon**: The decentralized discovery and robustness layer that finds better ways to train Neural Operators, validates them adversarially under hidden stress, and compounds that knowledge across the network.
+
+The broader industry is rapidly advancing toward **Software Defined Machines** and **Living Digital Twins**, where high-fidelity models serve as the single source of truth across the entire product lifecycle — from design and embedded control to ongoing operation and predictive maintenance, continuously refined by real-world sensor data. Leading platforms such as JuliaHub’s Dyad are building modern acausal modeling environments, deep SciML integration (neural surrogates, model discovery, differentiable programming), generative AI assistance, and cloud-native deployment workflows to realize this vision for industrial engineering (aerospace, automotive, energy, etc.).
+
+**Carbon plays a distinct and complementary role** in this ecosystem:
+
+- While centralized platforms focus on usability, integration, model generation, and accelerating surrogate creation within a single environment, Carbon is the **decentralized discovery and robustness engine**.
+- Carbon enables massively parallel exploration of Neural Operator training strategies across a global network of agents and miners.
+- It applies rigorous, hidden adversarial stress testing with physics-class-specific gates that centralized systems struggle to replicate at scale.
+- The Landscape Agent extracts symbolic features and causal relationships, turning individual evaluations into compounding collective intelligence about *how* to best train and validate these surrogates.
+
+This makes Carbon particularly valuable for producing surrogates that are not only fast but genuinely robust, physically trustworthy, and auditable — critical for safety-critical and regulated applications within the Software Defined Machines and Living Digital Twins paradigm.
+
+In essence: Platforms like Dyad modernize the modeling and surrogate *environment*; Carbon discovers and validates the superior *methodologies* that power higher-performing, more reliable digital twins across the network.
 
 A PhD reviewer should be able to verify that the system is not merely optimizing for benchmark scores but is enforcing and learning physically meaningful behavior while leveraging decentralized parallel exploration to innovate faster than centralized alternatives.
 
