@@ -1,6 +1,6 @@
 # SPEC.md — Carbon PDE Subnet Technical Specification (Buildable Level with Strategic Emphasis)
 
-**Version:** 4.8 (Updated July 2026) — **Hardened MCP Mode 1 Testing**
+**Version:** 4.9 (Updated July 2026) — **Corrected MCP Testing Design**
 **Audience**: Researchers and engineers with PhD-level background in Physics, Computational Mechanics, or Scientific Computing.
 
 This specification provides sufficient detail for a domain expert to understand the scientific rationale, implementation logic, and expected behavior of every major component. It is intended to be buildable and scientifically defensible.
@@ -23,6 +23,8 @@ Centralized teams explore this space linearly. Carbon is designed to explore it 
 
 ### 2.1 Purpose and Design Goals
 The validator runs inside a hardened Docker container that provides a fully reproducible environment for accepting strategy configurations as JSON, dynamically selecting and instantiating the correct neural operator backbone, executing deterministic training on the appropriate data mixture, running hidden stress tests and physics gates, evaluating on held-out benchmark data, and producing auditable results and artifacts (including rich Model Cards).
+
+**Important Design Principle**: The validator **always performs full training and full evaluation** the same way, regardless of whether the submission comes from a test loop or a production submission. This ensures consistency, determinism, fairness, and scientific integrity.
 
 ### 2.2 Full Strategy JSON Schema (Detailed)
 
@@ -181,41 +183,37 @@ The container is self-contained with the backbone registry, data generators, str
 
 ## 3. Agent-Friendly MCP Mining Loop, Internal Testing & Advanced Features
 
-### 3.1 Testing Philosophy
-Test modes are designed so that **miners provide the training compute**. The validator primarily performs verification, evaluation, hidden stress testing, and gating. This keeps validator costs low and scalable while ensuring miners do the heavy lifting for training. Data and testing conditions used by the validator are hidden and different from what the miner sees during their local training run.
+### 3.1 Core Principle
+The validator **always trains and evaluates submissions the exact same way**, whether the submission comes from an agent's internal testing loop or a final production submission. This ensures consistency, determinism, fairness, and strong adversarial guarantees.
 
-### 3.2 Hardened Mode 1: Light Training + Gated Evaluation (Recommended Test Mode)
+Miners and agents are free (and encouraged) to run their own **local training loops** before submission to iterate quickly on ideas. These local loops are entirely on the miner's hardware and do not affect the validator.
 
-**Miner Responsibility**:
-- Miner performs a **light training run** locally (reduced epochs, smaller model variant, accelerated curriculum, or subset of data) on their own hardware using the strategy JSON.
-- Miner submits the resulting model checkpoint (or weights) + the original strategy JSON to the validator via MCP.
+### 3.2 Internal Testing Loop (Pre-Submission Iteration)
+Agents/miners can run repeated local training + quick evaluation cycles on their own hardware using the strategy JSON. This allows fast prototyping without spamming the validator.
 
-**Validator Responsibility (Verification & Evaluation Only)**:
-- Loads the submitted checkpoint (verifies it matches the JSON backbone and config within tolerance).
-- Runs held-out benchmark evaluation on official hidden data the miner does not have access to.
-- Generates fresh hidden StressTestSet (seeded, adversarial, different from what the miner used locally).
-- Runs the submitted model on the hidden stress variants.
-- Applies **full physics gates** (hard gates still zero the score on critical violations).
-- Computes a real test score using the 45/30/25 formulation.
-- Returns rich explainable diagnostics and Model Card.
+When ready, they submit the JSON to the validator via MCP. The validator then performs the **full deterministic training + hidden stress + physics gates + scoring** exactly as it would for any other submission.
 
-This mode provides fast, meaningful feedback (typically in minutes) while the miner bears the training compute cost. The validator's use of different/hidden data and stress ensures the test is still adversarial and not gameable.
+**Why this is different and defensible**:
+- The validator always uses hidden data and fresh adversarial stress that the miner could not have seen during local training.
+- Local pre-submission training by the miner does not give them access to the validator's hidden evaluation data or stress variants.
+- All official scoring and emissions impact comes only from validator-executed runs.
 
-### 3.3 Other Modes
-- **Simulated / Cached Approximation**: Early prototyping with fast approximations (validator may do minimal computation).
-- **Full Production Submission**: Miner performs full training locally, submits checkpoint. Validator performs full evaluation + hidden stress + gates. Only these submissions can set new best combined scores and earn strong emissions weight.
+### 3.3 Production vs Test Distinction
+The distinction between "test" and "production" submissions is primarily in how the results are used:
+- Test submissions may have rate limits, lower priority, or lower weighting in the Landscape Agent.
+- Only production submissions contribute to the official leaderboard and primary emissions via the ChallengeWinnerTracker.
+- The validator computation itself remains identical.
 
 ### 3.4 Prior-Informed Warm Start, Explainable Diagnostics, and Pareto Reporting
-Agents can request prior-informed initialization. Test and production runs return explainable diagnostics and can optionally return Pareto fronts.
+Agents can request prior-informed initialization from the Landscape Agent. All validator runs (test or production) return rich explainable diagnostics. Test submissions can optionally request Pareto-style reporting.
 
 ### 3.5 Defensibility
-- Miner bears training compute cost.
-- Validator uses hidden data/stress not available to the miner during local training.
-- Clear separation of test vs production (test scores do not affect leaderboard or primary emissions).
-- Rate limiting on test modes.
-- Full determinism, provenance via Model Cards, and lower weighting for test runs in the Landscape Agent.
+- Validator always performs identical full training + evaluation.
+- Hidden data and stress variants are never available to the miner during local pre-submission loops.
+- Clear separation in how results are used (test vs production) without changing validator logic.
+- Rate limiting and provenance via Model Cards.
 
-This hardened design keeps the loop agent-friendly and high-signal while ensuring miners provide the compute and the validator maintains adversarial integrity.
+This design allows fast agent iteration while keeping the core validation process consistent and hard to game.
 
 ---
 
@@ -267,7 +265,7 @@ Ingests results and Model Cards from production and high-quality test runs. Extr
 - HydrogenScorer
 - Backbone Registry (dynamic instantiation from JSON)
 - Validator Docker image (model card generator, residual monitoring)
-- MCP layer (multi-mode testing with miner-provided light training + validator verification/gating, explainable diagnostics, warm-start support)
+- MCP layer (supports local pre-submission training loops by miners + validator full training/evaluation, explainable diagnostics, warm-start support)
 - generate_challenge()
 - Reproducibility Harness
 
@@ -280,7 +278,7 @@ Ingests results and Model Cards from production and high-quality test runs. Extr
 - Multi-fidelity evaluation
 - Automated Model Cards
 - Explainable diagnostics
-- Hardened MCP Mode 1 (miner light training + validator gated evaluation)
+- Support for miner local pre-submission training loops
 
 **Phase 1**:
 - Prior-informed warm starts
