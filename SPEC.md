@@ -1,297 +1,136 @@
 # SPEC.md — Carbon PDE Subnet Technical Specification (Buildable Level with Strategic Emphasis)
 
-**Version:** 4.9 (Updated July 2026) — **Corrected MCP Testing Design**
+**Version:** 5.0 (Updated July 2026) — **Final Miner Loop + Data Handling Design**
 **Audience**: Researchers and engineers with PhD-level background in Physics, Computational Mechanics, or Scientific Computing.
 
 This specification provides sufficient detail for a domain expert to understand the scientific rationale, implementation logic, and expected behavior of every major component. It is intended to be buildable and scientifically defensible.
 
 ---
 
-## 1. Scientific Motivation & Strategic Positioning
+## Miner Compute, Local Iteration & Submission Model
 
-High-fidelity simulation remains the bottleneck in engineering design, optimization, digital twins, and real-time control. Traditional solvers scale poorly with design space size or real-time requirements. Pure data-driven ML surrogates are fast but frequently violate conservation laws, stability conditions, or boundary physics, rendering them unreliable for downstream engineering use.
+### 1. Core Philosophy
 
-The space for AI-powered physics simulation and Neural Operators is still **nascent**. There is a tremendous amount left to discover in *how* to best build, train, and use these models for real engineering problems.
+- The **validator always performs full deterministic training + hidden adversarial stress evaluation** the same way for every submission.
+- Miners and autonomous agents run **local iterative training loops** on their own hardware (or rented machines) to improve strategies before submission.
+- **Submission is always free**. Local training is an *optional enhancement*, not a requirement.
+- The system distributes **noisy priors** only (never the clean champion) to enable compounding while protecting the moat.
+- High-quality Landscape knowledge (causal insights, symbolic patterns) is protected and shared selectively via strategic guidance.
 
-Centralized teams explore this space linearly. Carbon is designed to explore it in parallel across thousands of strategies with strong selection pressure from hidden adversarial validation and compounding knowledge via the Landscape Agent.
+### 2. Three-Tier Local System
 
-**Core Thesis**: A properly aligned decentralized subnet can discover superior Neural Operator training methodologies faster and cheaper than centralized players, while providing trustless, verifiable robustness.
+| Tier                    | Compute Cost      | Anchored To          | Purpose                              | Required Before Submission? | Cost Estimate Provided? |
+|-------------------------|-------------------|----------------------|--------------------------------------|-----------------------------|-------------------------|
+| **Estimation Mode**     | Near-zero         | Noisy Prior          | Rapid idea screening & filtering     | No                          | Yes (if renting)        |
+| **Light Training Mode** | Low               | Noisy Prior          | Main iterative improvement loop      | No (recommended)            | Yes                     |
+| **Validator (Official)**| Network-paid      | Full hidden data     | Official scoring + emissions         | Yes                         | N/A                     |
 
----
+**Key Rule**: A miner can submit a strategy JSON to the validator at any time with zero local training. Training is purely optional to help them submit stronger strategies.
 
-## 2. Validator Docker Image, Backbone Selection, Training, Evaluation & Advanced Features
+### 3. Data, Stress Tests, and Physics Gates in Internal Mining Loops
 
-### 2.1 Purpose and Design Goals
-The validator runs inside a hardened Docker container that provides a fully reproducible environment for accepting strategy configurations as JSON, dynamically selecting and instantiating the correct neural operator backbone, executing deterministic training on the appropriate data mixture, running hidden stress tests and physics gates, evaluating on held-out benchmark data, and producing auditable results and artifacts (including rich Model Cards).
+#### 3.1 Core Principle
+Internal mining loops (Estimation Mode and Light Training Mode) must use **different data and stress conditions** from the validator’s hidden evaluation set. This preserves the adversarial integrity of official scoring while still providing useful signal for iteration.
 
-**Important Design Principle**: The validator **always performs full training and full evaluation** the same way, regardless of whether the submission comes from a test loop or a production submission. This ensures consistency, determinism, fairness, and scientific integrity.
+Miners and agents **never** have access to the validator’s hidden test data or the full hidden stress variant set during local loops.
 
-### 2.2 Full Strategy JSON Schema (Detailed)
+#### 3.2 Training Data in Local Loops
+- Local loops may use procedural data generation and The Well slices.
+- Data generation should use different random seeds or subsampling strategies than the validator.
+- Custom datasets are allowed if properly validated.
+- The goal is to enable meaningful training signal without replicating the validator’s exact data distribution.
 
-Miners and agents submit strategies as structured JSON. Below is the current detailed schema for Phase 0/1 (extensible in later phases). The validator validates the JSON against this schema.
+#### 3.3 Local Stress Testing and Evaluation
+- **Estimation Mode**: Uses fast approximations anchored to the noisy prior. No actual stress rollout is performed.
+- **Light Training Mode**: May run a **reduced, non-hidden set** of stress-like variants for local evaluation. These variants must be different from the validator’s hidden stress set.
+- Local stress testing should still apply physics-aware metrics (residuals, conservation, stability) for signal quality.
+- Full hard physics gates **can** be applied during Light Training Mode for better learning signal, but this does not replace the validator’s official gated evaluation.
 
-```json
-{
-  "schema_version": "1.0",
-  "strategy_id": "unique-uuid-or-hash",
+#### 3.4 Why This Separation Matters
+- Prevents miners from gaming the official hidden stress by tuning against it locally.
+- Maintains strong defensibility of the validator pipeline.
+- Still allows fast, high-signal local iteration.
+- Ensures that only strategies evaluated under the true hidden adversarial conditions receive official credit and emissions.
 
-  "backbone": {
-    "type": "FNO" | "DeepONet" | "U-Net" | "GraphNO" | "PINO" | "Custom",
-    "config": {
-      // FNO example
-      "modes": 12,
-      "width": 64,
-      "n_layers": 4,
-      "padding": 9,
-      "fourier_modes": [12, 12, 12],
-      "activation": "gelu" | "relu" | "silu",
+### 4. Estimation Mode (Noisy-Prior Only)
 
-      // DeepONet example
-      "branch_net": { "layers": [128, 128, 64] },
-      "trunk_net": { "layers": [128, 128, 64] },
-      "output_dim": 1,
+**Purpose**: Allow very fast, near-zero-cost screening of ideas.
 
-      // U-Net / ResNet example
-      "channels": [64, 128, 256, 512],
-      "kernel_size": 3,
-      "dropout": 0.1,
+**Rules**:
+- Must be based **only on the latest noisy prior** for the challenge + backbone.
+- Never uses the clean champion model.
+- Returns estimated deltas, confidence, and risk notes.
+- Clearly labeled as an *estimate* (not a substitute for actual training).
 
-      // PINO-specific
-      "physics_loss_weight": 0.5,
-      "boundary_loss_weight": 0.3,
+**Recommended Implementation**:
+- Linear / sensitivity-based approximation around the noisy prior.
+- Optional small proxy model for improved signal.
+- Returns structured output with confidence score.
 
-      // Common
-      "normalization": "instance" | "batch" | "layer" | "none",
-      "skip_connections": true
-    }
-  },
+This mode is ideal for high-volume search by autonomous agents and quick filtering by human miners.
 
-  "training": {
-    "optimizer": "AdamW" | "Adam" | "LBFGS" | "SGD",
-    "lr": 0.001,
-    "weight_decay": 1e-4,
-    "lr_schedule": {
-      "type": "cosine" | "step" | "exponential" | "reduce_on_plateau" | "constant",
-      "params": { "T_max": 100, "eta_min": 1e-6 }
-    },
-    "epochs": 200,
-    "batch_size": 32,
-    "gradient_clip_val": 1.0,
-    "accumulate_grad_batches": 1,
-    "precision": "32" | "16-mixed",
+### 5. Local Training (Optional Enhancement)
 
-    "loss": {
-      "pde_residual": 1.0,
-      "boundary": 0.5,
-      "initial_condition": 0.3,
-      "conservation": 0.2,
-      "data_fidelity": 0.8,
-      "physics_informed": 0.6,
-      "spectral": 0.1,           // spectral consistency
-      "symmetry": 0.05,
-      "advanced": {
-        "causal_weighting": false,
-        "curriculum_loss_ramping": true,
-        "adaptive_reweighting": true
-      }
-    },
+Miners may optionally run actual training loops starting from the noisy prior:
 
-    "curriculum": {
-      "type": "progressive" | "self_paced" | "difficulty_based" | "fixed",
-      "params": {
-        "start_difficulty": 0.3,
-        "end_difficulty": 1.0,
-        "ramp_epochs": 80,
-        "difficulty_metric": "shock_strength" | "viscosity" | "coupling_strength"
-      }
-    },
+- **Light Training Mode** (recommended default): Reduced budget with multi-fidelity local evaluation + physics-residual monitoring.
+- **Full Local Confirmation**: Longer runs for final validation before submission.
 
-    "data_mixture": {
-      "procedural": {
-        "weight": 0.65,
-        "sampling": "uniform" | "difficulty_based" | "uncertainty_based",
-        "max_variants_per_epoch": 500
-      },
-      "well_slices": {
-        "weight": 0.25,
-        "dataset_filter": "turbulence" | "viscoelastic" | "acoustic" | "all_relevant",
-        "augmentation": "physics_preserving" | "standard"
-      },
-      "custom_dataset": {
-        "weight": 0.10,
-        "source": "abaqus" | "user_upload" | "none",
-        "validation_required": true
-      }
-    },
+Training is provided as a convenience to improve submission quality. It is not required.
 
-    "early_stopping": {
-      "patience": 20,
-      "monitor": "val_loss" | "physics_residual" | "combined_score"
-    }
-  },
+### 6. Submission Model (Zero Friction)
 
-  "conditioning": {
-    "type": "none" | "FiLM" | "hypernetwork" | "parameter_embedding",
-    "config": {
-      "embedding_dim": 64,
-      "num_params": 5
-    }
-  },
+- Miners can submit a strategy JSON to the validator **at any time**.
+- No local training is required to submit.
+- The validator will perform full training from the submitted JSON + full hidden stress testing + physics gates.
+- Only submissions that set a new best combined score on the validator side receive strong weight in the ChallengeWinnerTracker.
 
-  "uncertainty": {
-    "type": "none" | "evidential" | "ensemble" | "dropout_mc",
-    "config": {
-      "num_ensembles": 5,
-      "dropout_rate": 0.1
-    }
-  },
+### 7. Cost Estimation
 
-  "evaluation_preferences": {
-    "multi_fidelity_tier": "auto" | "tier1_only" | "tier2_full",
-    "diagnostics_level": "basic" | "detailed" | "full_explainable",
-    "return_pareto": false
-  },
+When a miner chooses to use rented compute (Targon, Chutes, RunPod, etc.), the Miner Toolkit must provide clear upfront cost estimates before execution.
 
-  "metadata": {
-    "description": "Short human-readable description of the strategy",
-    "tags": ["fno", "burgers", "shock-capturing"],
-    "author": "miner_hotkey_or_agent_id",
-    "version": "1.2"
-  }
-}
-```
+Examples:
+- Light Training on 1× A100 ≈ $X–$Y
+- Full local confirmation on 1× H100 ≈ $X–$Y
 
-### 2.3 Backbone Registry & Dynamic Instantiation
-The Docker image contains a Backbone Registry. Upon receiving the JSON, the validator looks up the `backbone.type`, instantiates the model with the provided `config`, applies conditioning and uncertainty modules if specified, and seeds all weights deterministically using the hierarchical seeding system.
+### 8. Miner Toolkit (Docker Image + Interface)
 
-### 2.4 Data Pipeline & Deterministic Training
-The validator builds a fully seeded data pipeline according to `data_mixture`. Procedural data is generated on-the-fly, The Well slices are sampled deterministically, and custom datasets are loaded with seeded data loaders. Training follows the exact optimizer, learning rate schedule, loss weights, curriculum, and early stopping rules defined in the JSON. All random operations are controlled for full reproducibility.
+A dedicated **Miner Toolkit** Docker image will be provided with:
 
-### 2.5 Multi-Fidelity Evaluation + Uncertainty-Aware Stress
-The validator supports multi-fidelity evaluation (Tier 1 cheap filter → Tier 2 full stress) and can prioritize stress variants based on model uncertainty when the backbone supports it.
+- CLI for easy local and rented execution.
+- Python SDK for autonomous agents (propose → train/evaluate → decide → submit).
+- Automatic noisy prior loading.
+- Templates for common backbones.
+- Built-in multi-fidelity local evaluation and physics monitoring.
+- Cost estimation for rented providers.
 
-### 2.6 Online Physics Residual Monitoring + Adaptive Behavior
-During training the validator monitors PDE residuals and conservation metrics in real time and can apply dynamic loss re-weighting (within JSON-defined bounds) or early stopping on persistent physics violations.
+**Target Experience**:
+- A novice should be able to start a productive loop in < 5 minutes.
+- An autonomous agent should be able to run full iterative loops with minimal custom code.
 
-### 2.7 Automated Model Card Generation
-Every submission automatically generates a rich Model Card containing the full strategy JSON, training curves (hashed), held-out metrics, stress results, gate violations with physics explanations, symbolic features, and uncertainty statistics. These cards are logged and fed to the Landscape Agent.
+### 9. Security & Moat Protection
 
-### 2.8 Docker Implementation
-The container is self-contained with the backbone registry, data generators, stress system, scorer, reproducibility harness, and model card generator. Strategy JSON can be submitted via MCP or mounted volume.
+- Only **noisy priors** are distributed.
+- The clean champion model is never exposed.
+- High-value Landscape knowledge (raw causal graphs, detailed DML outputs) remains protected.
+- The rigid validator pipeline (hidden stress + physics gates + progress-only rewards) acts as the primary filter against low-value strategies.
+- All official scoring and emissions impact comes exclusively from validator-executed runs.
 
----
-
-## 3. Agent-Friendly MCP Mining Loop, Internal Testing & Advanced Features
-
-### 3.1 Core Principle
-The validator **always trains and evaluates submissions the exact same way**, whether the submission comes from an agent's internal testing loop or a final production submission. This ensures consistency, determinism, fairness, and strong adversarial guarantees.
-
-Miners and agents are free (and encouraged) to run their own **local training loops** before submission to iterate quickly on ideas. These local loops are entirely on the miner's hardware and do not affect the validator.
-
-### 3.2 Internal Testing Loop (Pre-Submission Iteration)
-Agents/miners can run repeated local training + quick evaluation cycles on their own hardware using the strategy JSON. This allows fast prototyping without spamming the validator.
-
-When ready, they submit the JSON to the validator via MCP. The validator then performs the **full deterministic training + hidden stress + physics gates + scoring** exactly as it would for any other submission.
-
-**Why this is different and defensible**:
-- The validator always uses hidden data and fresh adversarial stress that the miner could not have seen during local training.
-- Local pre-submission training by the miner does not give them access to the validator's hidden evaluation data or stress variants.
-- All official scoring and emissions impact comes only from validator-executed runs.
-
-### 3.3 Production vs Test Distinction
-The distinction between "test" and "production" submissions is primarily in how the results are used:
-- Test submissions may have rate limits, lower priority, or lower weighting in the Landscape Agent.
-- Only production submissions contribute to the official leaderboard and primary emissions via the ChallengeWinnerTracker.
-- The validator computation itself remains identical.
-
-### 3.4 Prior-Informed Warm Start, Explainable Diagnostics, and Pareto Reporting
-Agents can request prior-informed initialization from the Landscape Agent. All validator runs (test or production) return rich explainable diagnostics. Test submissions can optionally request Pareto-style reporting.
-
-### 3.5 Defensibility
-- Validator always performs identical full training + evaluation.
-- Hidden data and stress variants are never available to the miner during local pre-submission loops.
-- Clear separation in how results are used (test vs production) without changing validator logic.
-- Rate limiting and provenance via Model Cards.
-
-This design allows fast agent iteration while keeping the core validation process consistent and hard to game.
-
----
-
-## 4. Challenges by Phase (Specific Problem Definitions)
-
-### 4.1 Phase 0: Foundational Single-Physics Challenges
-
-| ID | Problem | Dimension | Key Physics | Reference / Notes |
-|----|---------|-----------|-------------|-------------------|
-| 1 | Poisson | 2D/3D | Elliptic, source-driven | Standard benchmark; variable source amplitude/location, coefficient fields |
-| 2 | Darcy | 2D/3D | Elliptic, heterogeneous media | Variable permeability fields (smooth + discontinuous); tests conservation & maximum principle |
-| 3 | Burgers | 2D | Hyperbolic, nonlinear advection + viscosity | Shock formation/capturing, conservation, long-time stability |
-| 4 | Navier-Stokes (laminar) | 2D/3D | Incompressible flow | Reynolds-number variation in laminar regime; divergence-free constraint, energy stability |
-| 5 | Heat | 2D | Parabolic, transient conduction | Time-dependent forcing, variable conductivity, long-term decay |
-| 6 | Linear Elasticity | 2D | Vector mechanics, equilibrium | Material property variation (Young's modulus, Poisson ratio), boundary displacement |
-| 7 | Thermo-Elasticity | 2D | Coupled thermal-mechanical | Thermal expansion, coupling strength, temperature loading; tests coupled conservation |
-
-Each challenge includes public training/holdout splits and hidden stress configurations. Symbolic metadata is attached.
-
-### 4.2 Phase 1: Customization Layer
-Same 7 challenges + custom datasets and LoRA/custom strategy support.
-
-### 4.3 Phase 2: Verified Multi-Physics Composition
-FSI (Turek/Hron), CHT, and expanded Thermo-Elasticity with preCICE and reference solutions.
-
-### 4.4 Phase 3: 3D Multi-Physics & Advanced Composition
-3D FSI/CHT/Thermo-elasticity with turbulence, 3D-specific gates, and curriculum from 2D specialists.
-
----
-
-## 5. Validation Strategy — Scientific Rigor & Competitive Edge
-
-Multi-objective scoring (45/30/25), hard/soft physics gates, and hidden stress testing. Multi-fidelity and uncertainty-aware extensions enhance throughput and sophistication.
-
----
-
-## 6. Determinism & Reproducibility
-Hierarchical seeding and Docker-based reproducibility harness ensure all training, stress testing, and scoring are reproducible and auditable.
-
----
-
-## 7. Landscape Agent — Symbolic & Causal Compounding
-Ingests results and Model Cards from production and high-quality test runs. Extracts symbolic features and applies causal analysis to discover effective training methodologies.
-
----
-
-## 8. Detailed Implementation Components
-- Stress Generators & StressEvaluator (multi-fidelity support)
-- HydrogenScorer
-- Backbone Registry (dynamic instantiation from JSON)
-- Validator Docker image (model card generator, residual monitoring)
-- MCP layer (supports local pre-submission training loops by miners + validator full training/evaluation, explainable diagnostics, warm-start support)
-- generate_challenge()
-- Reproducibility Harness
-
----
-
-## 9. Phased Roadmap (Build-Level)
+### 10. Phased Implementation
 
 **Phase 0**:
-- Core pipeline + full JSON schema support
-- Multi-fidelity evaluation
-- Automated Model Cards
-- Explainable diagnostics
-- Support for miner local pre-submission training loops
+- Miner Toolkit Docker image with local support.
+- Noisy prior distribution.
+- Estimation Mode (noisy-prior based).
+- Light Training templates + local multi-fidelity evaluation.
+- Direct submission path.
+- Basic cost estimation.
 
 **Phase 1**:
-- Prior-informed warm starts
-- Uncertainty-aware stress
-- Pareto reporting
-- Enhanced curriculum and adaptive loss features
-
-**Phase 2+**: Multi-physics, 3D, advanced agent-proposed stress variants.
-
----
-
-## 10. Scientific Defensibility & Competitive Differentiation
-All extensions are designed to be scientifically grounded, reproducible, and auditable while enabling faster discovery of superior Neural Operator training methodologies.
+- Cloud rental integration (Targon + Chutes first).
+- Python SDK for agents.
+- Improved defaults and templates.
+- Strategic guidance integration.
 
 ---
 
