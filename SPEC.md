@@ -1,5 +1,8 @@
 # SPEC.md — Carbon PDE Subnet Technical Specification (Buildable Level with Strategic Emphasis)
 
+**Version:** 4.4 (Updated July 2026)
+**Audience**: Researchers and engineers with PhD-level background in Physics, Computational Mechanics, or Scientific Computing.
+
 This specification provides sufficient detail for a domain expert to understand the scientific rationale, implementation logic, and expected behavior of every major component. It is intended to be buildable and scientifically defensible.
 
 ---
@@ -26,9 +29,102 @@ The system is designed so that a domain expert can verify that submitted strateg
 
 ---
 
-## 2. Challenges by Phase (Specific Problem Definitions)
+## 2. Validator Docker Image and Execution Environment
 
-### Phase 0: Foundational Single-Physics Challenges
+### 2.1 Purpose and Design Goals
+The validator runs inside a Docker container to guarantee a consistent, reproducible execution environment across all validators. This is critical for:
+- Deterministic scoring and stress testing results.
+- Reproducibility across different hardware and validator instances.
+- Auditability and dispute resolution.
+- Easy deployment and scaling on validator infrastructure.
+
+### 2.2 Base Image and Dependencies
+- Base: Official PyTorch image with CUDA support (or CPU-only variant for broader compatibility).
+- Key installed components:
+  - PyTorch with cuDNN and deterministic flags enabled at runtime.
+  - Julia (for symbolic processing and planned ModelingToolkit integration).
+  - preCICE (for future multi-physics coupling in Phase 2+).
+  - FEniCS / DOLFINx or equivalent for reference solution generation.
+  - The Well dataset utilities and physics-preserving augmentation libraries.
+  - Stress generator and evaluator modules.
+  - Landscape Agent dependencies (scikit-learn for DML, PySR, etc.).
+- Environment variables enforced inside the container:
+  - `PYTHONHASHSEED=0`
+  - `CUBLAS_WORKSPACE_CONFIG=:4096:8` (or equivalent for determinism)
+  - `TORCH_DETERMINISTIC=1`
+  - Hierarchical seed derivation from `challenge_id` + `validator_hotkey` + `run_id`.
+
+### 2.3 Container Launch and Operation
+The validator container is launched with:
+- Volume mounts for:
+  - Challenge data and reference solutions (read-only).
+  - Model checkpoints and strategy submissions.
+  - Logs and reproducibility artifacts.
+- Network access limited to Bittensor network and necessary data sources.
+- Resource limits (CPU/GPU/memory) configurable via docker-compose or orchestration.
+
+On startup, the container:
+1. Loads the current challenge configuration (deterministically generated).
+2. Initializes the Reproducibility Harness.
+3. Begins listening for miner submissions via the MCP interface (or direct subnet protocol).
+4. Runs hidden stress generation and evaluation in a fully seeded, deterministic manner.
+
+### 2.4 Reproducibility and Audit Features Inside Docker
+- All random operations (data loading, augmentation, training, stress variant generation) are controlled by hierarchical seeds.
+- Key tensors and metrics are logged with checksums.
+- A post-run reproducibility check can be triggered by any validator or auditor using the same container image and inputs.
+- Docker image is versioned and pinned; changes require governance approval and image rebuild.
+
+This Docker-based approach ensures that any validator can reproduce another validator’s scoring and stress test outcomes within numerical tolerance, providing strong defensibility for the subnet.
+
+---
+
+## 3. Agent-Friendly MCP Mining Loop and Internal Testing
+
+### 3.1 Overview and Goals
+The MCP (Miner/Agent Control Protocol) layer provides a structured, agent-friendly interface for both human miners and autonomous agents to participate in Carbon. The design prioritizes fast iteration, local/subset testing, streaming feedback, and defensibility against gaming or spam while remaining open to sophisticated agentic workflows.
+
+### 3.2 Core Features of the MCP Mining Loop
+- **Persistent Sessions**: Agents can maintain long-lived connections for continuous strategy development and monitoring.
+- **Streaming Results**: Partial and final scores, gate outcomes, stress metrics, and diagnostics are streamed back in real time (or near-real time) rather than requiring full round completion.
+- **Built-in Internal Testing Loop**:
+  - Agents can submit strategies for **quick local or subset testing** without committing to a full network-wide scoring round.
+  - Supported test modes:
+    - Local dry-run on agent hardware (using a provided reference implementation or subset of challenges).
+    - Validator-side quick evaluation on a small number of stress variants or public holdout data only.
+    - Full hidden stress test on a limited difficulty tier (for early feedback).
+  - Fast feedback loop: Results returned in seconds to minutes instead of full epoch time.
+  - This enables rapid iteration: agents can debug, tune hyperparameters, test new loss formulations or curricula, and receive actionable diagnostics before submitting a production strategy.
+
+### 3.3 Defensibility and Anti-Gaming Measures
+The MCP design includes several mechanisms to maintain fairness and prevent abuse:
+
+- **Separation of Testing vs Scoring Paths**:
+  - Internal/quick tests do not affect the main leaderboard or emissions.
+  - Only full, hidden-stress-evaluated submissions on the complete challenge set contribute to the ChallengeWinnerTracker and rewards.
+- **Rate Limiting and Credit System**: Agents have limited "test credits" per epoch or per challenge to prevent spam. Production submissions may require staking or have higher cost.
+- **Deterministic and Auditable Testing**: All test runs use the same seeded environment as full scoring. Results can be reproduced and audited.
+- **Strategy Provenance and Versioning**: Every submission (test or production) includes metadata (agent hotkey, timestamp, strategy hash, config). This prevents replay attacks and enables tracking of strategy evolution.
+- **Phased Difficulty and Progressive Disclosure**: Early testing tiers use lower difficulty or fewer stress variants. Full hidden stress is only applied to production submissions, preserving the adversarial nature of the main evaluation.
+- **Agent Authentication and Permissions**: MCP enforces hotkey-based authentication. Sophisticated agents can be granted higher testing quotas based on historical performance or staking.
+
+### 3.4 Integration with Scoring and Landscape Agent
+- Test results can optionally be ingested (with lower weight or as diagnostic data) by the Landscape Agent to improve priors even from non-production runs.
+- Full production submissions flow through the complete HydrogenScorer + StressEvaluator pipeline with all physics gates.
+- Diagnostics from both test and production runs are rich (per-variant metrics, gate violations with explanations, spectral/consistency plots where applicable) to support agent debugging and improvement.
+
+### 3.5 Benefits for Autonomous Agents and Human Miners
+- **Autonomous Agents**: Can implement closed-loop strategy optimization, using MCP test endpoints as a fast reward signal or environment for reinforcement learning / evolutionary search.
+- **Human Miners**: Can rapidly prototype ideas locally or via quick validator tests before committing compute to full submissions.
+- **Overall Subnet Health**: The fast feedback loop increases participation quality and iteration speed without compromising the integrity of the main adversarial evaluation.
+
+This MCP design makes Carbon significantly more agent-friendly than traditional subnets while maintaining strong scientific and incentive defensibility.
+
+---
+
+## 4. Challenges by Phase (Specific Problem Definitions)
+
+### 4.1 Phase 0: Foundational Single-Physics Challenges
 
 | ID | Problem | Dimension | Key Physics | Reference / Notes |
 |----|---------|-----------|-------------|-------------------|
@@ -42,11 +138,11 @@ The system is designed so that a domain expert can verify that submitted strateg
 
 Each challenge includes public training/holdout splits and hidden stress configurations. Symbolic metadata (conservation laws, symmetries, boundary types) is attached.
 
-### Phase 1: Customization Layer
+### 4.2 Phase 1: Customization Layer
 
 Same 7 challenges + support for custom datasets (Abaqus ODB/.fil ingestion) and LoRA/custom strategy parameters. Focus remains on single-physics robustness with richer data diversity.
 
-### Phase 2: Verified Multi-Physics Composition
+### 4.3 Phase 2: Verified Multi-Physics Composition
 
 **Phase 2A — Benchmark Problems**:
 - FSI (Fluid-Structure Interaction): Turek/Hron 2D benchmarks (FSI-1/2/3). Reference: partitioned coupling via preCICE + OpenFOAM/CalculiX or equivalent. Key physics: fluid-structure interaction, added mass, vortex shedding.
@@ -58,7 +154,7 @@ Generate ~48 mesh-converged Tier-1 reference cases at 256^{2} using FEniCS monol
 **Phase 2C — Variant Expansion**:
 New Reynolds numbers, geometries, coupling strengths on the above. Three-track leaderboard (Monolithic / Composition / Specialist-Only).
 
-### Phase 3: 3D Multi-Physics & Advanced Composition
+### 4.4 Phase 3: 3D Multi-Physics & Advanced Composition
 
 - 3D FSI (cylinder/flap with turbulence)
 - 3D Thermo-Elasticity (bimetal, engine, turbine components)
@@ -70,9 +166,9 @@ Reference solutions: preCICE partitioned, FEniCS/OpenFOAM monolithic where appro
 
 ---
 
-## 3. Validation Strategy — Scientific Rigor & Competitive Edge
+## 5. Validation Strategy — Scientific Rigor & Competitive Edge
 
-### 3.1 Multi-Objective Scoring (45/30/25)
+### 5.1 Multi-Objective Scoring (45/30/25)
 
 Final combined score = w_p · PhysicsFidelity + w_r · Robustness + w_a · Accuracy, with w = [0.45, 0.30, 0.25].
 
@@ -92,7 +188,7 @@ Only new best combined scores on a challenge receive strong weight from the Chal
 **Accuracy (25%)**:
 - Hold-out / benchmark error (relative L2, max error)
 
-### 3.2 Physics Gates (Enforcement Layer)
+### 5.2 Physics Gates (Enforcement Layer)
 
 **Hard Gates** (score = 0 on violation — non-negotiable physical constraints):
 - Mass conservation: ‖∇·u‖ / ‖u‖ < threshold (typically 1e-3)
@@ -108,7 +204,7 @@ Phase-field specific: crack irreversibility (∂d/∂t ≥ 0), length-scale cons
 
 These gates are designed so that a PhD-level reviewer can verify they correspond to fundamental physical requirements of the PDE class.
 
-### 3.3 Hidden Stress Testing (Adversarial Robustness — Core Moat)
+### 5.3 Hidden Stress Testing (Adversarial Robustness — Core Moat)
 
 Stress is generated per physics class with explicit scientific justification. Number of variants and parameter ranges scale with difficulty. All variants carry `physics_justification` metadata.
 
@@ -161,7 +257,7 @@ See `docs/STRESS_TEST_DESIGN.md` and current `neurons/stress/procedural_generato
 
 ---
 
-## 4. Determinism & Reproducibility (Scientific Trust & Credibility Moat)
+## 6. Determinism & Reproducibility (Scientific Trust & Credibility Moat)
 
 Every evaluation must be reproducible given only public inputs + validator identity. Hierarchical seeding + framework controls achieve this.
 
@@ -173,7 +269,7 @@ PyTorch determinism flags + environment provenance recording enable cross-valida
 
 ---
 
-## 5. Landscape Agent — Symbolic & Causal Compounding (Core Innovation Engine)
+## 7. Landscape Agent — Symbolic & Causal Compounding (Core Innovation Engine)
 
 The Landscape Agent is the component that turns decentralized evaluation into collective intelligence — enabling Carbon to discover better *ways* to train Neural Operators.
 
@@ -195,11 +291,11 @@ See design notes for DML implementation sketch and data schemas.
 
 ---
 
-## 6. Detailed Implementation Components
+## 8. Detailed Implementation Components
 
 (See current code in `neurons/` for reference implementations that match the interfaces below.)
 
-**Stress Generators**: Registry-based with physics-class-specific deep implementations (parameter variation logic as described in Section 3.3).
+**Stress Generators**: Registry-based with physics-class-specific deep implementations (parameter variation logic as described in Section 5.3).
 
 **StressEvaluator**: Runs model on StressTestSet, applies gates, returns structured results (hard failures, soft penalties, per-variant metrics, stress contribution).
 
@@ -207,11 +303,11 @@ See design notes for DML implementation sketch and data schemas.
 
 **generate_challenge()**: Deterministic function returning Challenge object with training/holdout references, stress_config, and attached SymbolicMetadata.
 
-**MCP Layer**: Handles strategy submission, streaming results, and built-in testing endpoints.
+**MCP Layer**: Handles strategy submission, streaming results, built-in testing endpoints, and agent authentication (detailed in Section 3).
 
 ---
 
-## 7. Phased Roadmap (Build-Level)
+## 9. Phased Roadmap (Build-Level)
 
 **Phase 0**:
 - Stress generators (procedural deep per class + Well) with determinism.
@@ -221,12 +317,14 @@ See design notes for DML implementation sketch and data schemas.
 - Symbolic extractor + PySR skeleton.
 - ChallengeWinnerTracker.
 - generate_challenge() with symbolic attachment.
+- Validator Docker image definition and reproducibility harness.
 
 **Phase 1**:
 - Abaqus ODB/.fil parser (mesh + field outputs: stress/strain/displacement/history).
 - CustomDataset mixing with procedural data.
 - Initial Landscape Agent (DML causal updates + symbolic enrichment).
 - Expanded determinism in data paths.
+- Enhanced MCP testing modes and credit system.
 
 **Phase 2**:
 - preCICE orchestration for FSI (Turek/Hron) and CHT benchmarks.
@@ -238,10 +336,11 @@ See design notes for DML implementation sketch and data schemas.
 - 3D turbulence initialization (Kolmogorov spectrum) and 3D-specific gates (energy spectrum, Q-criterion, wall shear, Nu).
 - 3D FSI/CHT/Thermo-elasticity with appropriate references (preCICE, OpenFOAM, FEniCS).
 - Advanced Landscape Agent outputs and Foundation Operator foundations.
+- Full MCP production features and agent governance.
 
 ---
 
-## 8. Scientific Defensibility & Competitive Differentiation
+## 10. Scientific Defensibility & Competitive Differentiation
 
 Every stress dimension is chosen because it directly probes a fundamental physical property of the PDE class (conservation, stability, shock capturing, coupling strength, etc.). Hard gates correspond to non-negotiable physical requirements. The Landscape Agent's causal analysis provides interpretable insights into what actually improves physical fidelity and robustness. Determinism ensures results are reproducible and auditable by domain experts.
 
