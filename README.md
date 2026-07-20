@@ -1,8 +1,8 @@
-# Hydrogen
+# Carbon
 
 **Decentralized Agentic Engine for Robust Physics-Informed Neural Operator Surrogates**
 
-Hydrogen is a Bittensor subnet that builds a decentralized, agentic system where miners and autonomous agents collaboratively discover fast, robust, and physics-respecting training strategies for high-fidelity engineering surrogates. It combines an **MCP-powered participation layer with built-in testing loops**, a **rigorous hidden adversarial validation mechanism**, and a **Landscape Agent that compounds symbolic and causal knowledge** over time. The result is an accelerating engine that produces surrogates far more effectively than centralized labs.
+Carbon is a Bittensor subnet that builds a decentralized, agentic system where miners and autonomous agents collaboratively discover fast, robust, and physics-respecting training strategies for high-fidelity engineering surrogates. It combines an **MCP-powered participation layer with built-in testing loops**, a **rigorous hidden adversarial validation mechanism**, and a **Landscape Agent that compounds symbolic and causal knowledge** over time. The result is an accelerating engine that produces surrogates far more effectively than centralized labs.
 
 ---
 
@@ -16,7 +16,7 @@ A self-improving decentralized intelligence layer for physical modeling — wher
 
 Traditional high-fidelity simulation is too slow and expensive for large design spaces or real-time use. Pure data-driven ML surrogates are fast but often violate fundamental physical constraints, limiting their reliability in engineering.
 
-Hydrogen produces **physics-informed neural operator surrogates** through a unique engine that delivers:
+Carbon produces **physics-informed neural operator surrogates** through a unique engine that delivers:
 
 - **Valuable Causal + Symbolic Dataset**: Every evaluation under hidden stress generates rich, physics-grounded data, symbolic features (conservation laws, symmetries), and causal relationships between strategy choices and outcomes. This dataset is far more informative than standard benchmarks and compounds over time.
 
@@ -58,12 +58,12 @@ Every submission goes through a rigorous, hidden validation process:
   - Accuracy (25%): Benchmark/hold-out performance.
   Only strategies that set a new best *combined score* on a challenge receive meaningful weight.
 
-This combination ensures surrogates are not just accurate on known data but genuinely robust and physically trustworthy under unseen conditions — critical for engineering adoption.
+This combination ensures surrogates are not just accurate on known data but genuinely robust and physically trustworthy under unseen conditions.
 
 ### 4. Feedback, Landscape Agent & Knowledge Compounding
 Agents receive detailed scores, gate outcomes, and diagnostics. All results are ingested by the **Landscape Agent**, which:
 - Extracts symbolic features (conservation laws, symmetries, etc., via PySR and planned ModelingToolkit integration).
-- Applies causal analysis (Double Machine Learning) to understand which strategy choices causally improve outcomes — for example, learning that certain loss-weight schedules or curriculum strategies causally improve long-term rollout stability under hidden stress variations.
+- Applies causal analysis (Double Machine Learning) to understand which strategy choices causally improve outcomes — for example, learning that certain loss-weight schedules causally improve long-term rollout stability under hidden stress variations.
 - Updates a compounding knowledge base and priors.
 - Drives specialist distillation and better future challenges.
 
@@ -112,4 +112,4 @@ We welcome contributions in stress testing, determinism, symbolic integration, M
 
 ---
 
-*Hydrogen is building the decentralized agentic infrastructure for trustworthy, compounding physical intelligence in engineering and science.*
+*Carbon is building the decentralized agentic infrastructure for trustworthy, compounding physical intelligence in engineering and science.*
