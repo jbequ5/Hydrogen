@@ -1,6 +1,6 @@
 # SPEC.md — Carbon PDE Subnet Technical Specification (Buildable Level with Strategic Emphasis)
 
-**Version:** 4.4 (Updated July 2026)
+**Version:** 4.5 (Updated July 2026)
 **Audience**: Researchers and engineers with PhD-level background in Physics, Computational Mechanics, or Scientific Computing.
 
 This specification provides sufficient detail for a domain expert to understand the scientific rationale, implementation logic, and expected behavior of every major component. It is intended to be buildable and scientifically defensible.
@@ -29,96 +29,168 @@ The system is designed so that a domain expert can verify that submitted strateg
 
 ---
 
-## 2. Validator Docker Image and Execution Environment
+## 2. Validator Docker Image, Backbone Selection, Training, and Evaluation Pipeline
 
 ### 2.1 Purpose and Design Goals
-The validator runs inside a Docker container to guarantee a consistent, reproducible execution environment across all validators. This is critical for:
-- Deterministic scoring and stress testing results.
-- Reproducibility across different hardware and validator instances.
-- Auditability and dispute resolution.
-- Easy deployment and scaling on validator infrastructure.
+The validator runs inside a hardened Docker container that provides a fully reproducible environment for:
+- Accepting strategy configurations as JSON.
+- Dynamically selecting and instantiating the correct neural operator backbone.
+- Executing deterministic training on the appropriate data mixture.
+- Running hidden stress tests and physics gates.
+- Evaluating on held-out benchmark data.
+- Producing auditable, reproducible results and artifacts.
 
-### 2.2 Base Image and Dependencies
-- Base: Official PyTorch image with CUDA support (or CPU-only variant for broader compatibility).
-- Key installed components:
-  - PyTorch with cuDNN and deterministic flags enabled at runtime.
-  - Julia (for symbolic processing and planned ModelingToolkit integration).
-  - preCICE (for future multi-physics coupling in Phase 2+).
-  - FEniCS / DOLFINx or equivalent for reference solution generation.
-  - The Well dataset utilities and physics-preserving augmentation libraries.
-  - Stress generator and evaluator modules.
-  - Landscape Agent dependencies (scikit-learn for DML, PySR, etc.).
-- Environment variables enforced inside the container:
-  - `PYTHONHASHSEED=0`
-  - `CUBLAS_WORKSPACE_CONFIG=:4096:8` (or equivalent for determinism)
-  - `TORCH_DETERMINISTIC=1`
-  - Hierarchical seed derivation from `challenge_id` + `validator_hotkey` + `run_id`.
+This design ensures that any validator can exactly reproduce another validator’s training, stress testing, and scoring outcomes (within numerical tolerance), which is essential for trust, auditability, and defensibility of the subnet.
 
-### 2.3 Container Launch and Operation
-The validator container is launched with:
-- Volume mounts for:
-  - Challenge data and reference solutions (read-only).
-  - Model checkpoints and strategy submissions.
-  - Logs and reproducibility artifacts.
-- Network access limited to Bittensor network and necessary data sources.
-- Resource limits (CPU/GPU/memory) configurable via docker-compose or orchestration.
+### 2.2 Strategy JSON Schema (Input Contract)
+Miners and agents submit strategies as structured JSON with the following top-level keys (extensible in later phases):
 
-On startup, the container:
-1. Loads the current challenge configuration (deterministically generated).
-2. Initializes the Reproducibility Harness.
-3. Begins listening for miner submissions via the MCP interface (or direct subnet protocol).
-4. Runs hidden stress generation and evaluation in a fully seeded, deterministic manner.
+```json
+{
+  "strategy_id": "unique-hash-or-uuid",
+  "backbone": {
+    "type": "FNO" | "DeepONet" | "U-Net" | "GraphNO" | "PINO" | "Custom",
+    "config": { ... }   // architecture-specific hyperparameters
+  },
+  "training": {
+    "optimizer": "AdamW" | "LBFGS" | ...,
+    "lr_schedule": {...},
+    "epochs": 100,
+    "batch_size": 32,
+    "loss_weights": { "pde_residual": 1.0, "boundary": 0.5, ... },
+    "curriculum": { "type": "progressive" | "self_paced" | "fixed", "params": {...} },
+    "data_mixture": {
+      "procedural_weight": 0.7,
+      "well_slices_weight": 0.2,
+      "custom_dataset_weight": 0.1
+    }
+  },
+  "conditioning": { ... },           // e.g., FiLM, hypernetwork, or parameter embedding
+  "uncertainty": { "type": "evidential" | "ensemble" | "none" },
+  "metadata": { "description": "...", "tags": [...] }
+}
+```
 
-### 2.4 Reproducibility and Audit Features Inside Docker
-- All random operations (data loading, augmentation, training, stress variant generation) are controlled by hierarchical seeds.
-- Key tensors and metrics are logged with checksums.
-- A post-run reproducibility check can be triggered by any validator or auditor using the same container image and inputs.
-- Docker image is versioned and pinned; changes require governance approval and image rebuild.
+The validator validates the JSON against a schema and rejects malformed submissions.
 
-This Docker-based approach ensures that any validator can reproduce another validator’s scoring and stress test outcomes within numerical tolerance, providing strong defensibility for the subnet.
+### 2.3 Backbone Registry and Dynamic Selection
+The container includes a **Backbone Registry** (Python module with registration decorators). Supported backbones in Phase 0/1 include:
+- Fourier Neural Operator (FNO) variants
+- DeepONet and variants
+- U-Net / ResNet-based operators
+- Graph Neural Operators
+- Physics-Informed Neural Operators (PINO) with hard/soft constraint options
+- Custom / user-defined (via LoRA or plugin interface in later phases)
+
+Upon receiving the JSON, the validator:
+1. Looks up the backbone type in the registry.
+2. Instantiates the model with the provided `config`.
+3. Applies any conditioning or uncertainty modules specified.
+4. Moves the model to the correct device with deterministic seeding.
+
+This registry pattern allows easy extension of new backbones without changing core validator logic.
+
+### 2.4 Data Pipeline and Training Execution
+The validator constructs a deterministic data pipeline based on the `data_mixture` in the JSON:
+
+- **Procedural Data**: Generated on-the-fly using the seeded `ProceduralStressGenerator` (or challenge-specific data generator) for the current challenge. Parameters are derived from the master seed + strategy_id.
+- **The Well Slices**: Deterministically sampled relevant dataset slices (mapped to physics class) with physics-preserving augmentations.
+- **Custom Datasets** (Phase 1+): Loaded from approved sources (Abaqus ODB/.fil, user-uploaded with validation) using seeded data loaders.
+
+Training loop:
+- Fully deterministic (hierarchical seeding for weight init, data order, dropout, augmentation).
+- Uses the loss formulation and weights from the JSON.
+- Curriculum strategy executed as specified.
+- Optimizer and learning rate schedule applied exactly as configured.
+- Intermediate checkpoints and metrics logged with hashes for auditability.
+- Early stopping or convergence criteria can be defined in the JSON (with safeguards).
+
+All random operations inside training are controlled so that two validators running the identical JSON on the same challenge produce bitwise-identical model weights (within floating-point tolerance) and identical training curves.
+
+### 2.5 Held-Out Benchmark Evaluation + Hidden Stress Testing
+After training completes:
+
+1. **Held-Out Benchmark Evaluation**:
+   - The model is evaluated on the official held-out split for the challenge (publicly known data, never seen during training).
+   - Metrics: relative L2, max error, and any physics-specific benchmarks.
+
+2. **Hidden Stress Testing**:
+   - The validator generates a fresh `StressTestSet` using the deterministic `ProceduralStressGenerator` + Well slices (seeded from challenge + validator hotkey + run_id).
+   - The trained model is rolled out on every stress variant.
+   - Hard and soft physics gates are applied.
+   - Per-variant metrics + aggregate robustness score are computed.
+
+3. **Final Scoring**:
+   - The HydrogenScorer combines held-out accuracy, physics fidelity (from residuals/gates), and robustness (from hidden stress) using the 45/30/25 weighting.
+   - Only strategies that improve the current best combined score on this challenge receive strong weight in the ChallengeWinnerTracker.
+
+All outputs (metrics JSON, model checkpoint hash, gate violation details, stress variant results) are logged and made available for auditing.
+
+### 2.6 Docker Image Implementation Notes
+- The image contains the full registry of backbones, data generators, stress generators, scorer, and reproducibility harness.
+- Strategy JSON is accepted via MCP endpoint or mounted volume (for local testing).
+- Training can be GPU-accelerated inside the container with proper device seeding.
+- Resource limits and timeouts are enforced to prevent runaway jobs.
+- Image is version-pinned; updates require governance and rebuild.
+
+This design makes the validator a self-contained, executable specification of the entire evaluation pipeline.
 
 ---
 
-## 3. Agent-Friendly MCP Mining Loop and Internal Testing
+## 3. Agent-Friendly MCP Mining Loop, Internal Testing, and Strategy Validation
 
-### 3.1 Overview and Goals
-The MCP (Miner/Agent Control Protocol) layer provides a structured, agent-friendly interface for both human miners and autonomous agents to participate in Carbon. The design prioritizes fast iteration, local/subset testing, streaming feedback, and defensibility against gaming or spam while remaining open to sophisticated agentic workflows.
+### 3.1 Overview and Innovation Goals
+The MCP layer is designed to be highly agent-friendly while remaining scientifically and incentive-defensible. A key innovation is that **even "test" runs are meaningful**: they involve actual (light or simulated) training, are gated by physics constraints, evaluated under stress, and scored. This provides real signal to agents without compromising the adversarial nature of full production submissions.
 
-### 3.2 Core Features of the MCP Mining Loop
-- **Persistent Sessions**: Agents can maintain long-lived connections for continuous strategy development and monitoring.
-- **Streaming Results**: Partial and final scores, gate outcomes, stress metrics, and diagnostics are streamed back in real time (or near-real time) rather than requiring full round completion.
-- **Built-in Internal Testing Loop**:
-  - Agents can submit strategies for **quick local or subset testing** without committing to a full network-wide scoring round.
-  - Supported test modes:
-    - Local dry-run on agent hardware (using a provided reference implementation or subset of challenges).
-    - Validator-side quick evaluation on a small number of stress variants or public holdout data only.
-    - Full hidden stress test on a limited difficulty tier (for early feedback).
-  - Fast feedback loop: Results returned in seconds to minutes instead of full epoch time.
-  - This enables rapid iteration: agents can debug, tune hyperparameters, test new loss formulations or curricula, and receive actionable diagnostics before submitting a production strategy.
+### 3.2 Strategy Testing Modes in MCP
+Agents can request different testing modes via MCP. All modes still execute real training + evaluation pipelines (no pure simulation without training unless explicitly requested for very early prototyping).
 
-### 3.3 Defensibility and Anti-Gaming Measures
-The MCP design includes several mechanisms to maintain fairness and prevent abuse:
+**Mode 1: Light Training + Full Evaluation (Recommended for most testing)**
+- Reduced training budget (e.g., 20-40% of full epochs, smaller batch size, or accelerated curriculum).
+- Same backbone, loss formulation, and data mixture as the production JSON.
+- After light training, the model undergoes:
+  - Held-out benchmark evaluation.
+  - Hidden stress testing (can be on a reduced but still challenging subset of variants for speed, or full set with early stopping).
+  - Full physics gate application (hard gates still zero the score on critical violations).
+- Produces a **test score** (same 45/30/25 formulation) that is returned quickly to the agent.
+- This test score does **not** update the main leaderboard but is logged and can optionally contribute (with lower weight) to the Landscape Agent for prior improvement.
 
-- **Separation of Testing vs Scoring Paths**:
-  - Internal/quick tests do not affect the main leaderboard or emissions.
-  - Only full, hidden-stress-evaluated submissions on the complete challenge set contribute to the ChallengeWinnerTracker and rewards.
-- **Rate Limiting and Credit System**: Agents have limited "test credits" per epoch or per challenge to prevent spam. Production submissions may require staking or have higher cost.
-- **Deterministic and Auditable Testing**: All test runs use the same seeded environment as full scoring. Results can be reproduced and audited.
-- **Strategy Provenance and Versioning**: Every submission (test or production) includes metadata (agent hotkey, timestamp, strategy hash, config). This prevents replay attacks and enables tracking of strategy evolution.
-- **Phased Difficulty and Progressive Disclosure**: Early testing tiers use lower difficulty or fewer stress variants. Full hidden stress is only applied to production submissions, preserving the adversarial nature of the main evaluation.
-- **Agent Authentication and Permissions**: MCP enforces hotkey-based authentication. Sophisticated agents can be granted higher testing quotas based on historical performance or staking.
+**Mode 2: Simulated / Cached Training Approximation (Early prototyping only)**
+- For very rapid iteration, agents can request a simulated run that re-uses cached training dynamics or fast approximations (e.g., linear response around a known good model or reduced-order surrogate of the training process).
+- Still applies the same stress testing and physics gates on the resulting approximate model.
+- Clearly marked as "simulated" in results and given lower trust weight by the Landscape Agent.
+- Useful for hyperparameter sweeps or architecture search before committing to light or full training.
 
-### 3.4 Integration with Scoring and Landscape Agent
-- Test results can optionally be ingested (with lower weight or as diagnostic data) by the Landscape Agent to improve priors even from non-production runs.
-- Full production submissions flow through the complete HydrogenScorer + StressEvaluator pipeline with all physics gates.
-- Diagnostics from both test and production runs are rich (per-variant metrics, gate violations with explanations, spectral/consistency plots where applicable) to support agent debugging and improvement.
+**Mode 3: Full Production Submission**
+- Complete training budget as specified in the JSON.
+- Full hidden stress testing on the complete StressTestSet.
+- Full physics gates and scoring.
+- Only these submissions can set new best combined scores and earn strong emissions weight.
 
-### 3.5 Benefits for Autonomous Agents and Human Miners
-- **Autonomous Agents**: Can implement closed-loop strategy optimization, using MCP test endpoints as a fast reward signal or environment for reinforcement learning / evolutionary search.
-- **Human Miners**: Can rapidly prototype ideas locally or via quick validator tests before committing compute to full submissions.
-- **Overall Subnet Health**: The fast feedback loop increases participation quality and iteration speed without compromising the integrity of the main adversarial evaluation.
+### 3.3 Defensibility and Anti-Gaming Design
+- **Clear Separation of Concerns**: Test modes (1 and 2) never affect the official leaderboard or primary emissions. Only full production submissions do.
+- **Meaningful Signal in Testing**: Because light training + stress/gates still occurs, agents receive genuine feedback on whether their strategy is promising. This prevents wasted full submissions on obviously broken ideas.
+- **Rate Limiting & Credit System**: Each agent/hotkey has a limited number of test-mode runs per epoch or per challenge. Production submissions may have higher cost or staking requirements.
+- **Determinism**: All test and production runs are fully deterministic and reproducible inside the validator Docker image.
+- **Provenance & Auditing**: Every test and production run logs the exact JSON, seeds used, training curves (hashed), stress results, and gate outcomes.
+- **Phased Difficulty in Testing**: Early test modes can use easier stress variants or fewer variants while still applying hard physics gates. This gives fast feedback while preserving the adversarial character of the main evaluation.
+- **Landscape Agent Integration**: Even test runs can feed the Landscape Agent (with appropriate weighting), turning every agent interaction into collective intelligence.
 
-This MCP design makes Carbon significantly more agent-friendly than traditional subnets while maintaining strong scientific and incentive defensibility.
+### 3.4 Benefits for SOTA and Innovative Strategies
+This design strongly supports the development of state-of-the-art and innovative strategies:
+
+- Autonomous agents can implement closed-loop optimization (e.g., Bayesian optimization, evolutionary search, or reinforcement learning over strategy JSON space) using the fast but meaningful test-mode feedback as a reward signal.
+- Human miners can rapidly prototype novel loss formulations, curricula, conditioning schemes, or backbone modifications and receive gated, stress-tested scores within minutes instead of hours.
+- The combination of light-but-real training + adversarial stress testing in test mode creates a high-signal environment that rewards genuine innovation rather than benchmark overfitting.
+- Because test results are still physics-gated and stress-evaluated, the subnet maintains scientific integrity even during rapid agent-driven exploration.
+
+### 3.5 MCP Implementation Notes
+- MCP exposes endpoints for submitting JSON strategies in different modes (test_light, test_simulated, production).
+- Streaming of intermediate training metrics, gate status, and final scores is supported for long-running jobs.
+- Persistent sessions allow agents to maintain state across multiple test iterations.
+- Authentication is hotkey-based with optional higher quotas for high-performing or staked agents.
+
+This MCP + testing design makes Carbon one of the most agent-friendly yet rigorously defensible subnets, enabling the rapid discovery of superior Neural Operator methodologies that centralized platforms cannot easily replicate.
 
 ---
 
@@ -303,7 +375,9 @@ See design notes for DML implementation sketch and data schemas.
 
 **generate_challenge()**: Deterministic function returning Challenge object with training/holdout references, stress_config, and attached SymbolicMetadata.
 
-**MCP Layer**: Handles strategy submission, streaming results, built-in testing endpoints, and agent authentication (detailed in Section 3).
+**MCP Layer**: Handles strategy JSON submission in multiple modes (test_light, test_simulated, production), streaming results, built-in testing with light training + gated evaluation, and agent authentication (detailed in Section 3).
+
+**Backbone Registry**: Dynamic model instantiation from JSON `backbone` specification inside the validator Docker image.
 
 ---
 
@@ -313,18 +387,19 @@ See design notes for DML implementation sketch and data schemas.
 - Stress generators (procedural deep per class + Well) with determinism.
 - StressEvaluator + full scoring integration.
 - Determinism utilities and reproducibility harness.
-- MCP basics + testing loop.
+- MCP basics + testing loop with light training + gated evaluation.
 - Symbolic extractor + PySR skeleton.
 - ChallengeWinnerTracker.
 - generate_challenge() with symbolic attachment.
-- Validator Docker image definition and reproducibility harness.
+- Validator Docker image with backbone registry, JSON parsing, training pipeline, held-out + stress evaluation.
 
 **Phase 1**:
 - Abaqus ODB/.fil parser (mesh + field outputs: stress/strain/displacement/history).
 - CustomDataset mixing with procedural data.
 - Initial Landscape Agent (DML causal updates + symbolic enrichment).
 - Expanded determinism in data paths.
-- Enhanced MCP testing modes and credit system.
+- Enhanced MCP testing modes, credit system, and simulated training approximations.
+- LoRA / custom backbone plugin support.
 
 **Phase 2**:
 - preCICE orchestration for FSI (Turek/Hron) and CHT benchmarks.
@@ -336,7 +411,7 @@ See design notes for DML implementation sketch and data schemas.
 - 3D turbulence initialization (Kolmogorov spectrum) and 3D-specific gates (energy spectrum, Q-criterion, wall shear, Nu).
 - 3D FSI/CHT/Thermo-elasticity with appropriate references (preCICE, OpenFOAM, FEniCS).
 - Advanced Landscape Agent outputs and Foundation Operator foundations.
-- Full MCP production features and agent governance.
+- Full MCP production features, agent governance, and advanced testing modes.
 
 ---
 
