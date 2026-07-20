@@ -42,9 +42,7 @@ The **Landscape Agent** and Specialist Bank create a compounding moat by continu
 
 ## Validator & Miner Workflows (Upgraded Design)
 
-Carbon’s validator and participation layer are deliberately engineered to maximize both **scientific rigor** and **agent/miner productivity**.
-
-### High-Level Miner Experience
+Carbon is intentionally designed to make fast, scalable iteration accessible to both humans and autonomous agents. By lowering the barrier to running effective local search loops while maintaining rigorous hidden validation, the subnet creates the conditions for iteration at scale — turning decentralized participation into a powerful engine for discovering better Neural Operator training methodologies.
 
 Miners can submit a strategy at any time with zero local training required — the validator will always perform full training and hidden adversarial evaluation. To help miners arrive at stronger submissions, Carbon provides optional low-friction local tools:
 
