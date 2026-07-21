@@ -1,11 +1,4 @@
-# SPEC.md — Carbon PDE Subnet Technical Specification (Buildable Level with Strategic Emphasis)
-
-**Version:** 5.3 (July 2026) — **Proprietary Data Handling Plan Added**
-**Audience**: Researchers and engineers with PhD-level background in Physics, Computational Mechanics, or Scientific Computing.
-
-This specification provides sufficient detail for a domain expert to understand the scientific rationale, implementation logic, and expected behavior of every major component. It is intended to be buildable and scientifically defensible.
-
----
+# SPEC.md — Carbon - Physics Intelligence Subnet
 
 ## Trustless Verification & Data Generation System
 
