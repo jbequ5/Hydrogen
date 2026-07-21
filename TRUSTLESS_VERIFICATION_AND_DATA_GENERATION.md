@@ -2,7 +2,7 @@
 
 **Carbon PDE Subnet — Trustless Verification & Data Generation System**
 
-**Version:** 1.1 (July 2026) — **Post-Feedback Update**
+**Version:** 1.2 (July 2026) — **Proprietary Data Handling Plan Added**
 **Status**: Core Design Document
 
 This document defines Carbon’s approach to generating evaluation data (both for stress testing and benchmarking) in a way that is **trustless, auditable, unpredictable to miners, and scientifically credible**.
@@ -130,26 +130,42 @@ Anyone (including domain experts) can audit that the system is fair without need
 
 ---
 
-## 8. Phased Implementation
+## 8. Proprietary Data Handling Plan for Surrogate-as-a-Service
 
-**Phase 0**:
-- Open ProceduralStressGenerator with scientific justification
-- Public seeding using challenge_id + block_hash (no validator_hotkey)
-- Integration into validator evaluation (stress + benchmark data)
-- Local mode separation for agent/miner test runs
-- Basic documentation, threat model, and validation harness
+Carbon’s long-term vision includes the ability to safely incorporate signals from proprietary customer data. However, this capability must be built responsibly. The following phased plan reflects current technical realities and industry best practices for high-stakes engineering customers (aerospace, defense, energy, etc.).
 
-**Phase 1**:
-- Lightweight commit-reveal seeding layer
-- Evaluation of `drand` as public randomness beacon
-- Stronger generator validation pipeline with published harness
-- Versioned generator releases with deliberate, documented distribution changes
-- Enhanced strategic guidance from the Landscape Agent
+### 8.1 Guiding Principles
+- Raw proprietary data should **never** be required to leave the customer’s control in early phases.
+- Any future network-side processing of sensitive data must use strong privacy and confidentiality protections (Confidential Computing / TEEs + differential privacy).
+- Transparency and auditability are non-negotiable.
+- We prioritize customer-controlled models first, then gradually add privacy-preserving network contribution paths.
 
-**Phase 2+**:
-- Full commit-reveal + advanced gaming resistance mechanisms
-- Cross-domain causal analysis of generator behavior
-- Potential formal verification of key generator properties
+### 8.2 Phased Roadmap
+
+**Phase 0 (Current)**: Public + Synthetic Data Only
+- No proprietary data enters the network.
+- Customers benefit from strong priors and training methodologies discovered on public/synthetic data.
+- Value delivered through collective intelligence and trustless verification.
+
+**Phase 1 (Near-term, Recommended Starting Point)**: Customer-Controlled Local Fine-Tuning
+- Customers download Carbon priors and fine-tune locally on their own infrastructure using the Miner Toolkit or a local agent.
+- Raw proprietary data **never leaves** the customer’s environment.
+- Customers may optionally contribute privacy-preserved signals (differentially private model updates or landscape features) back to the network.
+- This model aligns with how risk-averse organizations (e.g., Boeing, NASA-class customers) typically adopt new AI tooling today.
+
+**Phase 2 (Medium-term)**: Confidential Computing + Privacy-Preserving Signals
+- Introduce NVIDIA Confidential Computing (or equivalent TEEs) on the validator side for workloads that need to touch sensitive data.
+- Data is processed inside protected enclaves; only aggregated or differentially private signals leave the TEE.
+- Publish attestation mechanisms so customers can verify how their data was handled.
+- This enables more direct contribution of useful training signals while maintaining strong confidentiality.
+
+**Phase 3 (Longer-term)**: Advanced Privacy-Preserving Training
+- Explore federated learning patterns combined with Confidential Computing.
+- Allow more sophisticated privacy-preserving training contributions from customers.
+- Maintain full auditability and formal privacy guarantees where feasible.
+
+### 8.3 Current Honest Assessment
+As of mid-2026, Carbon does **not** yet have the technical architecture to safely accept and process raw proprietary customer data inside the decentralized network. Claims of being able to broadly "pay for proprietary data" at scale are premature. The responsible path is to start with customer-controlled local execution and build toward confidential, privacy-preserving network contribution over time.
 
 ---
 
@@ -181,7 +197,7 @@ Full tables with exact distributions, references, and gate relationships will be
 
 ## 10. Relationship to Other Systems
 
-- **HydrogenScorer & Physics Gates** (now CarbonScorer): Act as independent quality filters on top of generated data.
+- **CarbonScorer & Physics Gates**: Act as independent quality filters on top of generated data.
 - **Landscape Agent**: Can analyze generator behavior and extracted symbolic features across evaluations.
 - **Miner Toolkit & Estimation Mode**: Use the same open generator (with different seeds) for fast local screening.
 - **MCP Layer**: Black-box diagnostics protect the hidden nature of official evaluations while still providing useful signal.
