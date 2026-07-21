@@ -1,6 +1,6 @@
 # SPEC.md — Carbon PDE Subnet Technical Specification (Buildable Level with Strategic Emphasis)
 
-**Version:** 5.2 (Updated July 2026) — **Trustless Verification System Formalized**
+**Version:** 5.3 (July 2026) — **Proprietary Data Handling Plan Added**
 **Audience**: Researchers and engineers with PhD-level background in Physics, Computational Mechanics, or Scientific Computing.
 
 This specification provides sufficient detail for a domain expert to understand the scientific rationale, implementation logic, and expected behavior of every major component. It is intended to be buildable and scientifically defensible.
@@ -13,14 +13,28 @@ Carbon uses a dedicated **Trustless Verification and Data Generation System** as
 
 ### Key Principles
 - All evaluation data (stress testing and benchmark/held-out) is generated **procedurally at runtime** using an open-source generator.
-- Generation is seeded by public, unpredictable information (Challenge ID + Block Hash + Validator Hotkey in Phase 0; moving toward commit-reveal in Phase 1).
+- Generation is seeded by public, unpredictable information (Challenge ID + Block Hash in Phase 0; moving toward commit-reveal + drand evaluation in Phase 1).
 - The system is designed to be **auditable by anyone** while remaining unpredictable to miners and agents.
 - Benchmark data quality is established through strong scientific justification of the generator + ongoing validation against high-fidelity reference solvers + physics gates as an independent filter.
 - We do **not** rely on fixed known reference datasets as the primary evaluation data (to preserve the trustless property).
 
-This approach replaces "trust the team" with "trust the open math and public seeding anyone can inspect."
+See `TRUSTLESS_VERIFICATION_AND_DATA_GENERATION.md` for the full design, including the Proprietary Data Handling Plan (Section 8).
 
-See `TRUSTLESS_VERIFICATION_AND_DATA_GENERATION.md` for the full design, including seeding mechanisms, benchmark quality proof, local vs validator separation, gaming resistance, and phased implementation.
+---
+
+## Proprietary Data Handling Plan (Summary)
+
+Carbon’s long-term vision includes safely incorporating signals from proprietary customer data. However, this must be built responsibly. The current phased plan prioritizes customer control and privacy:
+
+**Phase 0 (Current)**: Public + synthetic data only. No proprietary data enters the network.
+
+**Phase 1 (Near-term)**: Customer-controlled local fine-tuning. Customers run Carbon priors locally on their own infrastructure. Raw data never leaves customer control. Optional privacy-preserved signal contribution back to the network.
+
+**Phase 2 (Medium-term)**: Introduce Confidential Computing (NVIDIA stack) on the validator side for sensitive workloads. Only aggregated or differentially private signals leave protected enclaves.
+
+**Phase 3 (Longer-term)**: Explore federated learning + Confidential Computing patterns for more advanced privacy-preserving contributions.
+
+Full details and guiding principles are in `TRUSTLESS_VERIFICATION_AND_DATA_GENERATION.md` (Section 8).
 
 ---
 
@@ -239,7 +253,7 @@ Ingests results and Model Cards from production and high-quality test runs. Extr
 
 ## Detailed Implementation Components
 - Stress Generators & StressEvaluator (multi-fidelity support, integrated with trustless generation system)
-- HydrogenScorer
+- HydrogenScorer (now CarbonScorer)
 - Backbone Registry (dynamic instantiation from JSON)
 - Validator Docker image (model card generator, residual monitoring, trustless data generation)
 - MCP layer (black-box diagnostics with tiers, noisy prior distribution, Estimation Mode support)
