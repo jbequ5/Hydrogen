@@ -24,7 +24,7 @@ Carbon delivers **physics-informed neural operator surrogates** that are fast, r
 
 - **Compounding Collective Intelligence**: The Landscape Agent continuously extracts symbolic features and causal relationships from every evaluation. This turns individual discoveries into improving priors, reusable specialist components, and better future strategies for the entire network — creating accelerating returns over time.
 
-- **Trustless Verification & Auditability**: Full determinism, reproducibility, and transparent scoring/gate outcomes enable domain experts, regulators, and downstream systems to have high confidence in the surrogates produced. A core part of this is the Trustless Verification and Data Generation System, which uses open procedural generation with public unpredictable seeding.
+- **Trustless Verification**: Carbon produces models through a decentralized competitive network with independent, auditable verification. This is structurally difficult for any single company to replicate at scale.
 
 These capabilities make Carbon particularly valuable for producing reliable surrogates that power **Software Defined Machines** and **Living Digital Twins** — where models must remain physically trustworthy while being fast enough for real-time use, predictive maintenance, and over-the-air updates.
 
@@ -34,7 +34,7 @@ These capabilities make Carbon particularly valuable for producing reliable surr
 - Multi-physics problems (FSI, CHT, thermo-elasticity)
 - Digital twins and predictive maintenance
 - High-stakes domains (fusion, nuclear, advanced energy systems)
-- Long-term foundational physics modeling
+- Long-term foundational physics建模
 
 The **Landscape Agent** and Specialist Bank create a compounding moat by continuously improving the quality of strategies and components available to the network.
 
@@ -50,7 +50,7 @@ Three capabilities are prioritized from the start to enable this vision:
 - **Noisy priors + Estimation Mode**: Only noisy versions of strong strategies are shared. A near-zero-cost Estimation Mode allows rapid screening of new ideas using approximations anchored to these noisy priors.
 - **ModelingToolkit.jl integration**: Symbolic constraints discovered by the Landscape Agent will be turned into structured, usable loss terms early, making feedback significantly more actionable for local training loops.
 
-A core architectural feature is the **Trustless Verification and Data Generation System**. All evaluation data (stress and benchmark) is generated procedurally at runtime using an open generator seeded by public, unpredictable information. This keeps the data fresh and hidden while remaining fully auditable. Benchmark data quality is proven through scientific justification of the generator and validation against high-fidelity reference solvers, rather than relying on fixed known datasets.
+A core architectural feature is the **Trustless Verification and Data Generation System**. All evaluation data (stress and benchmark) is generated procedurally at runtime using an open generator seeded by public, unpredictable information. This keeps the data fresh and hidden while remaining fully auditable. Benchmark data quality is proven through scientific justification of the generator and validation against high-fidelity reference solvers.
 
 Miners can submit a strategy at any time with zero local training required — the validator will always perform full training and hidden adversarial evaluation. Optional low-friction local tools (Estimation Mode and Light Training) are available to help miners arrive at stronger submissions. Local loops use different data and stress conditions than the validator’s hidden set. Training is an enhancement, not a requirement.
 
@@ -149,11 +149,17 @@ This combination of decentralized exploration, rigorous hidden testing, and comp
 
 ## Competitive Positioning
 
-The broader industry is moving rapidly toward **Software Defined Machines** and **Living Digital Twins** — where models serve as the single source of truth across design, embedded control, deployment, and ongoing operation, continuously refined by real-world data. Leading efforts such as JuliaHub’s Dyad platform are building modern acausal modeling environments, SciML-powered surrogates, generative AI assistance, and cloud-native workflows to make this vision practical for industrial engineering.
+The broader industry is moving rapidly toward **Software Defined Machines** and **Living Digital Twins** — where models serve as the single source of truth across design, embedded control, deployment, and ongoing operation, continuously refined by real-world data.
 
-**Carbon occupies a distinct and complementary role**: while these platforms focus on making high-quality modeling and surrogate generation accessible and integrated, Carbon is the **decentralized discovery and robustness engine** that finds superior Neural Operator training methodologies, validates them under hidden adversarial stress with physics gates using a trustless verification system, and compounds that knowledge across the network via the Landscape Agent. This makes the surrogates produced for Software Defined Machines and Living Digital Twins more trustworthy, robust, and performant — especially for safety-critical and regulated applications.
+**Carbon occupies a distinct layer in the stack**:
 
-In short: Dyad and similar platforms modernize the modeling *environment*; Carbon discovers the *best ways* to train and validate the physics-informed surrogates that power the next generation of digital twins.
+- **NVIDIA** owns the compute engine and is increasingly providing open physics foundation models (Apollo, Cosmos). This is largely a demand generator for Carbon, not a direct competitor.
+- **Dyad, Ansys, Siemens, and similar platforms** own the modeling tools, environments, and deployment infrastructure. They consume and orchestrate models but generally produce them centrally and self-verify.
+- **Carbon** owns the decentralized, independently verified model-supply layer. It produces physics-informed surrogates through competitive network participation with trustless verification — something no single company can replicate at scale. This layer is currently the weakest and most structurally defensible part of the stack.
+
+Carbon’s primary advantage is its ability to coordinate distributed discovery and independent verification at scale. Over time, it can also incorporate privacy-preserving signals from proprietary data using confidential computing and other techniques, but its core strength today lies in public and synthetic data regimes combined with strong collective intelligence.
+
+In short: NVIDIA owns the engine. Dyad and Ansys own the tools. Carbon owns the decentralized, trustlessly verified supply of the models themselves.
 
 ---
 
