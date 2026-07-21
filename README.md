@@ -1,6 +1,6 @@
-# Carbon - A Physics Intelligence System
+# Carbon
 
-**Decentralized Incentive Network for Robust Physics-Informed Neural Operator Surrogates**
+**Decentralized Agentic Engine for Robust Physics-Informed Neural Operator Surrogates**
 
 Carbon is a Bittensor subnet that builds a decentralized, agentic system where miners and autonomous agents collaboratively discover fast, robust, and physics-respecting training strategies for high-fidelity engineering surrogates. It combines an **MCP-powered participation layer with built-in testing loops**, a **rigorous hidden adversarial validation mechanism**, and a **Landscape Agent that compounds symbolic and causal knowledge** over time. The result is an accelerating engine that has a real chance to outperform centralized players in this still-nascent space.
 
@@ -24,7 +24,7 @@ Carbon delivers **physics-informed neural operator surrogates** that are fast, r
 
 - **Compounding Collective Intelligence**: The Landscape Agent continuously extracts symbolic features and causal relationships from every evaluation. This turns individual discoveries into improving priors, reusable specialist components, and better future strategies for the entire network — creating accelerating returns over time.
 
-- **Trustless Verification & Auditability**: Full determinism, reproducibility, and transparent scoring/gate outcomes enable domain experts, regulators, and downstream systems to have high confidence in the surrogates produced.
+- **Trustless Verification & Auditability**: Full determinism, reproducibility, and transparent scoring/gate outcomes enable domain experts, regulators, and downstream systems to have high confidence in the surrogates produced. A core part of this is the Trustless Verification and Data Generation System, which uses open procedural generation with public unpredictable seeding.
 
 These capabilities make Carbon particularly valuable for producing reliable surrogates that power **Software Defined Machines** and **Living Digital Twins** — where models must remain physically trustworthy while being fast enough for real-time use, predictive maintenance, and over-the-air updates.
 
@@ -49,6 +49,8 @@ Three capabilities are prioritized from the start to enable this vision:
 - **Black-box diagnostics with clear tiers**: MCP feedback is deliberately limited to objective scores and high-level categories to protect the hidden evaluation data while still providing useful signal.
 - **Noisy priors + Estimation Mode**: Only noisy versions of strong strategies are shared. A near-zero-cost Estimation Mode allows rapid screening of new ideas using approximations anchored to these noisy priors.
 - **ModelingToolkit.jl integration**: Symbolic constraints discovered by the Landscape Agent will be turned into structured, usable loss terms early, making feedback significantly more actionable for local training loops.
+
+A core architectural feature is the **Trustless Verification and Data Generation System**. All evaluation data (stress and benchmark) is generated procedurally at runtime using an open generator seeded by public, unpredictable information. This keeps the data fresh and hidden while remaining fully auditable. Benchmark data quality is proven through scientific justification of the generator and validation against high-fidelity reference solvers, rather than relying on fixed known datasets.
 
 Miners can submit a strategy at any time with zero local training required — the validator will always perform full training and hidden adversarial evaluation. Optional low-friction local tools (Estimation Mode and Light Training) are available to help miners arrive at stronger submissions. Local loops use different data and stress conditions than the validator’s hidden set. Training is an enhancement, not a requirement.
 
@@ -96,11 +98,11 @@ Miners and agents interact through MCP, which supports persistent sessions, stre
 - **Phase 3**: 3D multi-physics (FSI, CHT, Thermo-elasticity with turbulence), 3D-specific gates, and curriculum progression from 2D specialists.
 
 ### 3. Validation Strategy (The Heart of Robustness)
-Every submission goes through a rigorous, hidden validation process:
+Every submission goes through a rigorous, hidden validation process powered by the Trustless Verification and Data Generation System:
 
-- **Benchmarking**: Performance on public holdout data (accuracy component).
-- **Hidden Stress Testing**: Adversarial evaluation under conditions miners cannot see or target. Includes procedural parametric variation (physics-class specific) and slices from The Well dataset. Future tiers add adversarial/uncertainty-guided stress.
-- **Physics Gates**: Hard gates (e.g., mass conservation, energy dissipation/stability, boundary satisfaction, rollout stability, UQ calibration) that zero the score on critical violations. Soft gates apply multiplicative penalties for finer issues (symmetry, spectral fidelity, etc.). Phase-field specific gates are also defined.
+- **Benchmarking**: Performance on procedurally generated held-out data (accuracy component).
+- **Hidden Stress Testing**: Adversarial evaluation under fresh, hidden conditions generated at runtime.
+- **Physics Gates**: Hard gates (e.g., mass conservation, energy dissipation/stability, boundary satisfaction, rollout stability, UQ calibration) that zero the score on critical violations.
 - **Multi-Objective Scoring (45/30/25)**: 
   - Physics Fidelity (45%): Residuals, conservation laws, boundary conditions, stability.
   - Robustness (30%): Performance under hidden stress, long-term rollout, generalization.
@@ -136,7 +138,7 @@ A properly aligned decentralized subnet like Carbon has a real chance to outperf
 
 Key advantages:
 - **Hidden Adversarial Validation**: Forces genuine robustness that is extremely hard to game.
-- **Trustless & Verifiable Stress Testing**: Full determinism and reproducibility give domain experts confidence in the results — a major credibility advantage for engineering adoption.
+- **Trustless & Verifiable Stress Testing**: The Trustless Verification and Data Generation System uses open procedural generation with public unpredictable seeding, making evaluation auditable by anyone.
 - **Compounding Intelligence**: The Landscape Agent turns individual discoveries into collective knowledge that improves future priors and specialist quality.
 - **Fast Agent Iteration**: MCP + built-in testing loop dramatically speeds discovery.
 - **Aligned Incentives**: Winner-heavy tracking with decay keeps focus on continuous, genuine improvement.
@@ -149,7 +151,7 @@ This combination of decentralized exploration, rigorous hidden testing, and comp
 
 The broader industry is moving rapidly toward **Software Defined Machines** and **Living Digital Twins** — where models serve as the single source of truth across design, embedded control, deployment, and ongoing operation, continuously refined by real-world data. Leading efforts such as JuliaHub’s Dyad platform are building modern acausal modeling environments, SciML-powered surrogates, generative AI assistance, and cloud-native workflows to make this vision practical for industrial engineering.
 
-**Carbon occupies a distinct and complementary role**: while these platforms focus on making high-quality modeling and surrogate generation accessible and integrated, Carbon is the **decentralized discovery and robustness engine** that finds superior Neural Operator training methodologies, validates them under hidden adversarial stress with physics gates, and compounds that knowledge across the network via the Landscape Agent. This makes the surrogates produced for Software Defined Machines and Living Digital Twins more trustworthy, robust, and performant — especially for safety-critical and regulated applications.
+**Carbon occupies a distinct and complementary role**: while these platforms focus on making high-quality modeling and surrogate generation accessible and integrated, Carbon is the **decentralized discovery and robustness engine** that finds superior Neural Operator training methodologies, validates them under hidden adversarial stress with physics gates using a trustless verification system, and compounds that knowledge across the network via the Landscape Agent. This makes the surrogates produced for Software Defined Machines and Living Digital Twins more trustworthy, robust, and performant — especially for safety-critical and regulated applications.
 
 In short: Dyad and similar platforms modernize the modeling *environment*; Carbon discovers the *best ways* to train and validate the physics-informed surrogates that power the next generation of digital twins.
 
@@ -157,9 +159,9 @@ In short: Dyad and similar platforms modernize the modeling *environment*; Carbo
 
 ## Current State & Roadmap
 
-Phase 0 foundations (scoring, stress testing across all physics classes, determinism utilities, MCP basics, symbolic skeleton, full integration of stress into scoring) are advancing rapidly. Phase 1 adds customization, Abaqus ingestion, and deeper symbolic/causal capabilities. Phase 2 brings verified multi-physics with preCICE. Phase 3 expands to 3D and more advanced composition.
+Phase 0 foundations (scoring, stress testing across all physics classes, determinism utilities, MCP basics, symbolic skeleton, full integration of stress into scoring, trustless data generation) are advancing rapidly. Phase 1 adds customization, Abaqus ingestion, and deeper symbolic/causal capabilities. Phase 2 brings verified multi-physics with preCICE. Phase 3 expands to 3D and more advanced composition.
 
-See `SPEC.md`, `docs/FUTURE_DOMAINS.md`, and other docs in the repository for full technical details.
+See `SPEC.md`, `TRUSTLESS_VERIFICATION_AND_DATA_GENERATION.md`, `docs/FUTURE_DOMAINS.md`, and other docs in the repository for full technical details.
 
 ---
 
