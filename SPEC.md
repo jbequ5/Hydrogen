@@ -1,9 +1,26 @@
 # SPEC.md — Carbon PDE Subnet Technical Specification (Buildable Level with Strategic Emphasis)
 
-**Version:** 5.1 (Updated July 2026) — **Initial Design Priorities Locked**
+**Version:** 5.2 (Updated July 2026) — **Trustless Verification System Formalized**
 **Audience**: Researchers and engineers with PhD-level background in Physics, Computational Mechanics, or Scientific Computing.
 
 This specification provides sufficient detail for a domain expert to understand the scientific rationale, implementation logic, and expected behavior of every major component. It is intended to be buildable and scientifically defensible.
+
+---
+
+## Trustless Verification & Data Generation System
+
+Carbon uses a dedicated **Trustless Verification and Data Generation System** as a core architectural component. Full details are documented in `TRUSTLESS_VERIFICATION_AND_DATA_GENERATION.md`.
+
+### Key Principles
+- All evaluation data (stress testing and benchmark/held-out) is generated **procedurally at runtime** using an open-source generator.
+- Generation is seeded by public, unpredictable information (Challenge ID + Block Hash + Validator Hotkey in Phase 0; moving toward commit-reveal in Phase 1).
+- The system is designed to be **auditable by anyone** while remaining unpredictable to miners and agents.
+- Benchmark data quality is established through strong scientific justification of the generator + ongoing validation against high-fidelity reference solvers + physics gates as an independent filter.
+- We do **not** rely on fixed known reference datasets as the primary evaluation data (to preserve the trustless property).
+
+This approach replaces "trust the team" with "trust the open math and public seeding anyone can inspect."
+
+See `TRUSTLESS_VERIFICATION_AND_DATA_GENERATION.md` for the full design, including seeding mechanisms, benchmark quality proof, local vs validator separation, gaming resistance, and phased implementation.
 
 ---
 
@@ -149,16 +166,19 @@ A dedicated **Miner Toolkit** Docker image will be provided with:
 - Light Training templates + local multi-fidelity evaluation
 - Direct submission path (always available)
 - Basic cost estimation for rented compute
+- Trustless procedural data generation system (open generator + public seeding)
 
 **Phase 1**:
 - ModelingToolkit.jl integration for turning PySR symbolic constraints into structured loss terms
 - Cloud rental integration (Targon + Chutes prioritized)
 - Stronger strategic guidance generation from the Landscape Agent
-- Initial Abaqus ingestion utilities (scoped)
+- Initial scoped Abaqus ingestion utilities
+- Enhanced trustless verification features (commit-reveal seeding, stronger generator validation)
 
 **Phase 2+**:
 - Cross-domain causal mapping via Double Machine Learning
 - Advanced agent tooling and multi-asset emissions features
+- Advanced gaming resistance mechanisms for the trustless verification system
 
 ---
 
@@ -203,12 +223,12 @@ FSI (Turek/Hron), CHT, and expanded Thermo-Elasticity with preCICE and reference
 
 ## Validation Strategy — Scientific Rigor & Competitive Edge
 
-Multi-objective scoring (45/30/25), hard/soft physics gates, and hidden stress testing. Multi-fidelity and uncertainty-aware extensions enhance throughput and sophistication.
+Multi-objective scoring (45/30/25), hard/soft physics gates, and hidden stress testing. The Trustless Verification and Data Generation System (see dedicated document) ensures that both stress and benchmark data are generated in a publicly seeded, auditable, and scientifically credible manner.
 
 ---
 
 ## Determinism & Reproducibility
-Hierarchical seeding and Docker-based reproducibility harness ensure all training, stress testing, and scoring are reproducible and auditable.
+Hierarchical seeding and Docker-based reproducibility harness ensure all training, stress testing, and scoring are reproducible and auditable. The trustless data generation system extends this reproducibility to the evaluation data itself.
 
 ---
 
@@ -218,14 +238,15 @@ Ingests results and Model Cards from production and high-quality test runs. Extr
 ---
 
 ## Detailed Implementation Components
-- Stress Generators & StressEvaluator (multi-fidelity support)
+- Stress Generators & StressEvaluator (multi-fidelity support, integrated with trustless generation system)
 - HydrogenScorer
 - Backbone Registry (dynamic instantiation from JSON)
-- Validator Docker image (model card generator, residual monitoring)
+- Validator Docker image (model card generator, residual monitoring, trustless data generation)
 - MCP layer (black-box diagnostics with tiers, noisy prior distribution, Estimation Mode support)
 - Miner Toolkit (local training templates, Estimation Mode, cost estimation)
 - generate_challenge()
 - Reproducibility Harness
+- Trustless Verification and Data Generation System (see dedicated document)
 
 ---
 
@@ -238,22 +259,25 @@ Ingests results and Model Cards from production and high-quality test runs. Extr
 - Light Training templates + local multi-fidelity evaluation
 - Direct submission path
 - Basic cost estimation
+- Trustless procedural data generation system (open generator + public seeding)
 
 **Phase 1**:
 - ModelingToolkit.jl integration for structured losses from PySR
 - Stronger strategic guidance from Landscape Agent
 - Initial scoped Abaqus ingestion
 - Cloud rental integration (Targon + Chutes first)
+- Enhanced trustless verification features (commit-reveal seeding, stronger generator validation)
 
 **Phase 2+**:
 - Cross-domain causal mapping
 - Advanced agent tooling
 - Multi-asset emissions features
+- Advanced gaming resistance mechanisms
 
 ---
 
 ## Scientific Defensibility & Competitive Differentiation
-All extensions are designed to be scientifically grounded, reproducible, and auditable while enabling faster discovery of superior Neural Operator training methodologies.
+All extensions are designed to be scientifically grounded, reproducible, and auditable while enabling faster discovery of superior Neural Operator training methodologies. The Trustless Verification and Data Generation System is a core part of this defensibility, replacing authority-based trust with verifiable, publicly inspectable mechanisms.
 
 ---
 
