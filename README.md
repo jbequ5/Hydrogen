@@ -1,6 +1,6 @@
 # Carbon
 
-**Decentralized Agentic Engine for Robust Physics-Informed Neural Operator Surrogates**
+**Decentralized Incentive System for Physics-Informed Neural Operator Surrogates**
 
 Carbon is a Bittensor subnet that builds a decentralized, agentic system where miners and autonomous agents collaboratively discover fast, robust, and physics-respecting training strategies for high-fidelity engineering surrogates. It combines an **MCP-powered participation layer with built-in testing loops**, a **rigorous hidden adversarial validation mechanism**, and a **Landscape Agent that compounds symbolic and causal knowledge** over time. The result is an accelerating engine that has a real chance to outperform centralized players in this still-nascent space.
 
