@@ -1,4 +1,6 @@
-# SPEC.md — Carbon - Physics Intelligence Subnet
+# SPEC.md — Carbon Physics Intelligence Subnet
+
+---
 
 ## Trustless Verification & Data Generation System
 
@@ -17,38 +19,74 @@ See `TRUSTLESS_VERIFICATION_AND_DATA_GENERATION.md` for the full design, includi
 
 ## Proprietary Data Handling Plan (Summary)
 
-Carbon’s long-term vision includes safely incorporating signals from proprietary customer data. However, this must be built responsibly. The current phased plan prioritizes customer control and privacy:
+Carbon's long-term vision includes safely incorporating signals from proprietary customer data. The current phased plan prioritizes customer control and privacy:
 
 **Phase 0 (Current)**: Public + synthetic data only. No proprietary data enters the network.
 
-**Phase 1 (Near-term)**: Customer-controlled local fine-tuning. Customers run Carbon priors locally on their own infrastructure. Raw data never leaves customer control. Optional privacy-preserved signal contribution back to the network.
+**Phase 1 (Near-term)**: Customer-controlled local fine-tuning. Customers run Carbon priors locally on their own infrastructure via the Air-Gapped Miner Toolkit. Raw data never leaves customer control. Optional privacy-preserved signal contribution back to the network.
 
 **Phase 2 (Medium-term)**: Introduce Confidential Computing (NVIDIA stack) on the validator side for sensitive workloads. Only aggregated or differentially private signals leave protected enclaves.
 
 **Phase 3 (Longer-term)**: Explore federated learning + Confidential Computing patterns for more advanced privacy-preserving contributions.
 
-Full details and guiding principles are in `TRUSTLESS_VERIFICATION_AND_DATA_GENERATION.md` (Section 8).
+### Dual-Regime Architecture (DoD/Regulated Markets)
 
+Carbon operates a **Dual-Regime Model Supply** for defense and regulated domains:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PUBLIC REGIME (Carbon Subnet)                                  │
+│  ├─ Discovers architectures on public/synthetic data            │
+│  ├─ Adversarial verification + physics gates                    │
+│  ├─ Outputs: Strategy.json + Model Card + ONNX + Evidence       │
+│  └─ Zero ITAR/controlled data                                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                    CROSS-DOMAIN SOLUTION / SECURE TRANSFER
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  CLASSIFIED REGIME (Prime Enclave IL5/IL6)                      │
+│  ├─ Ingests architecture blueprint (strategy.json)              │
+│  ├─ Fine-tunes on classified telemetry / proprietary geometry   │
+│  ├─ Deploys ONNX locally (HIL, edge, air-gapped)                │
+│  ├─ Runs inference LOCALLY — zero network calls                 │
+│  ├─ Applies ITAR/EAR classification (Prime's ECO)               │
+│  └─ Packages DI-SESS-82483 deliverable + ATO artifacts          │
+└─────────────────────────────────────────────────────────────────┘
+```
+- Public Regime: Subnet mechanics, evidence generation, zero ITAR
+- Transfer Layer: Cross-domain solution, secure media, CDS
+- Classified Regime: Air-Gapped Miner Toolkit, fine-tuning loop, ITAR classification, DI-SESS-82483 packaging, ATO evidence
+- Prime Onboarding Checklist (clearance, facility, contract vehicle)
+- Evidence Package Schema (Model Card → DI-SESS-82483 manifest)
+
+## SECTION C: Commercial GTM — Three Revenue Engines
+
+- **Engine 1 — Model Zoo (Tier 1)**: Product, pricing ($20-50k/yr), buyer, motion, differentiation, Phase 0 delivery
+- **Engine 2 — Sponsored Challenges (Tiers 2-4)**: Product, pricing (T2 $150-300k, T3 $400-800k, T4 $800k-2M+), buyer, motion, Challenge Factory CLI, standardized agreements
+- **Engine 3 — DoD Subcontract (SBIR/BAA)**: Positioning, entry vehicle, prime targets, Carbon deliverable, Prime deliverable, Phase 0.5 requirement
+- **Engine 4 — Verification Gas/Registry**: Asset, metering, pricing, partners, scale
+- **Revenue Projections**: Y1-Y4 table
+- **Execution Requirements**: Hires, contracts, milestones
 ---
 
 ## Initial Design Priorities (Phase 0 Focus)
 
 The following three capabilities are prioritized for the initial design because they directly enable low-friction, scalable iteration while protecting the integrity of the hidden validation system:
 
-### 1. Black-Box Diagnostics with Clear Diagnostic Tiers
-MCP diagnostics returned to miners and agents will be deliberately limited. Only objective scores, gate pass/fail status, and high-level category feedback will be provided. Precise geometric, spectral, or spatial hotspot information will not be exposed. This is a core architectural decision to protect the hidden stress distribution and prevent reverse-engineering of the validator’s evaluation data.
+### 1. Black-Box Diagnostics with Clear Diagnostic Tiers (Reputation-Gated)
 
-Clear diagnostic tiers will be defined early:
-- Basic tier: Objective scores + overall gate status
-- Intermediate tier: High-level failure categories (e.g., "long-rollout stability", "shock capturing")
-- Rich tier: Available only after strong performance or with additional rate-limiting/staking
+MCP diagnostics returned to miners and agents will be deliberately limited. Only objective scores, gate pass/fail status, and high-level category feedback will be provided. Precise geometric, spectral, or spatial hotspot information will not be exposed. This is a core architectural decision to protect the hidden stress distribution and prevent reverse-engineering of the validator's evaluation data.
 
 ### 2. Noisy Prior Distribution + Estimation Mode
+
 The system will distribute only noisy / perturbed versions of the current best strategies (never the clean champion). An Estimation Mode will be provided that allows near-zero-cost screening of new strategy ideas using fast approximations anchored to the noisy prior. This enables both human miners and autonomous agents to run fast, Autoresearch-style iteration loops with minimal friction while maintaining strong protection of the collective intelligence moat.
 
 Estimation Mode outputs will be clearly labeled as estimates with confidence scores. They are intended for rapid filtering and idea generation, not as a replacement for actual training or official validator evaluation.
 
 ### 3. ModelingToolkit.jl Integration for Structured Losses
+
 PySR symbolic constraints extracted by the Landscape Agent will be compiled into structured loss equations using ModelingToolkit.jl. This integration will be pursued early so that symbolic insights can be turned into concrete, differentiable loss terms that agents can directly use in their local training loops. This significantly increases the actionability of the feedback loop between the Landscape Agent and participating miners/agents.
 
 These three priorities are viewed as foundational for enabling iteration at scale while preserving scientific rigor and long-term defensibility.
@@ -78,21 +116,21 @@ These three priorities are viewed as foundational for enabling iteration at scal
 ### 3. Data, Stress Tests, and Physics Gates in Internal Mining Loops
 
 #### 3.1 Core Principle
-Internal mining loops (Estimation Mode and Light Training Mode) must use **different data and stress conditions** from the validator’s hidden evaluation set. This preserves the adversarial integrity of official scoring while still providing useful signal for iteration.
+Internal mining loops (Estimation Mode and Light Training Mode) must use **different data and stress conditions** from the validator's hidden evaluation set. This preserves the adversarial integrity of official scoring while still providing useful signal for iteration.
 
-Miners and agents **never** have access to the validator’s hidden test data or the full hidden stress variant set during local loops.
+Miners and agents **never** have access to the validator's hidden test data or the full hidden stress variant set during local loops.
 
 #### 3.2 Training Data in Local Loops
 - Local loops may use procedural data generation and The Well slices.
 - Data generation should use different random seeds or subsampling strategies than the validator.
 - Custom datasets are allowed if properly validated.
-- The goal is to enable meaningful training signal without replicating the validator’s exact data distribution.
+- The goal is to enable meaningful training signal without replicating the validator's exact data distribution.
 
 #### 3.3 Local Stress Testing and Evaluation
 - **Estimation Mode**: Uses fast approximations anchored to the noisy prior. No actual stress rollout is performed.
-- **Light Training Mode**: May run a **reduced, non-hidden set** of stress-like variants for local evaluation. These variants must be different from the validator’s hidden stress set.
+- **Light Training Mode**: May run a **reduced, non-hidden set** of stress-like variants for local evaluation. These variants must be different from the validator's hidden stress set.
 - Local stress testing should still apply physics-aware metrics (residuals, conservation, stability) for signal quality.
-- Full hard physics gates **can** be applied during Light Training Mode for better learning signal, but this does not replace the validator’s official gated evaluation.
+- Full hard physics gates **can** be applied during Light Training Mode for better learning signal, but this does not replace the validator's official gated evaluation.
 
 #### 3.4 Why This Separation Matters
 - Prevents miners from gaming the official hidden stress by tuning against it locally.
@@ -151,6 +189,7 @@ A dedicated **Miner Toolkit** Docker image will be provided with:
 - Templates for common backbones.
 - Built-in multi-fidelity local evaluation and physics monitoring.
 - Cost estimation for rented providers.
+- **Air-Gapped Mode** for classified enclave deployment (Phase 1).
 
 **Target Experience**:
 - A novice should be able to start a productive loop in < 5 minutes.
@@ -167,7 +206,7 @@ A dedicated **Miner Toolkit** Docker image will be provided with:
 ### 10. Phased Implementation
 
 **Phase 0**:
-- Black-box diagnostics with clear diagnostic tiers
+- Black-box diagnostics with clear diagnostic tiers (reputation-gated)
 - Noisy prior distribution + Estimation Mode (anchored to noisy priors)
 - Miner Toolkit Docker image with local support and basic Python interface
 - Light Training templates + local multi-fidelity evaluation
@@ -181,6 +220,7 @@ A dedicated **Miner Toolkit** Docker image will be provided with:
 - Stronger strategic guidance generation from the Landscape Agent
 - Initial scoped Abaqus ingestion utilities
 - Enhanced trustless verification features (commit-reveal seeding, stronger generator validation)
+- Air-Gapped Miner Toolkit for classified enclaves
 
 **Phase 2+**:
 - Cross-domain causal mapping via Double Machine Learning
@@ -217,20 +257,61 @@ Centralized teams explore this space linearly. Carbon is designed to explore it 
 
 Each challenge includes public training/holdout splits and hidden stress configurations. Symbolic metadata is attached.
 
-### 4.2 Phase 1: Customization Layer
-Same 7 challenges + custom datasets and LoRA/custom strategy support. Initial Abaqus ingestion utilities scoped for mesh + primary field translation.
+### 4.2 Phase 0.5: Defense-Relevant Benchmarks (Months 4-8)
 
-### 4.3 Phase 2: Verified Multi-Physics Composition
+Bridges academic PDEs to weapon-relevant physics. Each includes geometry, boundary conditions, flight envelope, and reference solutions for generator validation.
+
+| ID | Benchmark | Physics | Key Physics | Reference |
+|----|-----------|---------|-------------|-----------|
+| 8 | NACA 0012 Transonic Flutter | 2D/3D Compressible NS | Shock-boundary layer interaction, flutter onset | NASA TP-2001-211214 |
+| 9 | NASA CRM Wing-Body | 3D RANS | Transonic separation, buffet | AIAA DPW |
+| 10 | HIFiRE-1 Scramjet Forebody | Reacting NS (5-species) | Hypersonic BL transition, finite-rate chemistry | AFRL HIFiRE |
+| 11 | Turek/Hron FSI 3D | NS + Elasticity (preCICE) | Fluid-structure interaction, large displacement | FSI Benchmark |
+| 12 | Store Separation (6-DOF) | NS + Rigid Body Dynamics | Moving boundaries, dynamic mesh, unsteady forces | AF SEEK EAGLE |
+| 13 | Turbine Blade Heat Transfer | Conjugate Heat Transfer | Film cooling, CHT, rotating frame | NASA C3X |
+
+Each includes public training/holdout splits, hidden stress configurations, and symbolic metadata. Generator validation against reference solvers (FEniCS/OpenFOAM/SU2) is mandatory before mainnet inclusion.
+
+### 4.3 Phase 1: Customization Layer
+Same 7 + 0.5 challenges + custom datasets and LoRA/custom strategy support. Initial Abaqus ingestion utilities scoped for mesh + primary field translation.
+
+### 4.4 Phase 2: Verified Multi-Physics Composition
 FSI (Turek/Hron), CHT, and expanded Thermo-Elasticity with preCICE and reference solutions.
 
-### 4.4 Phase 3: 3D Multi-Physics & Advanced Composition
-3D FSI/CHT/Thermo-elasticity with turbulence, 3D-specific gates, and curriculum from 2D specialists.
+### 4.5 Phase 3: 3D Multi-Physics & Advanced Composition
+3D FSI/CHT/Thermo-elasticity with turbulence, 3D-specific gates, and curriculum progression from 2D specialists.
+
+
+## Phase 0.5 Benchmarks — Detailed Specifications
+**Insert After**: `Challenges by Phase` (as expanded Phase 0.5 subsection)
+**Content** (per benchmark):
+- Geometry source (STL/STEP/CAD)
+- Boundary conditions (flight envelope, Mach/Re/AoA ranges)
+- Turbulence/chemistry models
+- Reference solution source (NASA/AFRL/DPW)
+- Generator parameter ranges with scientific justification
+- Physics gates specific to regime (shock capture, separation, species conservation, thermal)
+- Validation criteria vs. reference solver
 
 ---
 
 ## Validation Strategy — Scientific Rigor & Competitive Edge
 
 Multi-objective scoring (45/30/25), hard/soft physics gates, and hidden stress testing. The Trustless Verification and Data Generation System (see dedicated document) ensures that both stress and benchmark data are generated in a publicly seeded, auditable, and scientifically credible manner.
+
+### Scoring Weights
+- **Physics Fidelity (45%)**: Residuals, conservation laws, boundary conditions, stability.
+- **Robustness (30%)**: Performance under hidden stress, long-term rollout, generalization.
+- **Accuracy (25%)**: Benchmark/hold-out performance.
+
+### ChallengeWinnerTracker (Emission Weighting)
+Only strategies that set a new best *combined score* on a challenge receive meaningful weight.
+
+- **Per-challenge leader tracking** with exponential decay on old performance:
+  `weight = score × e^(-blocks_since_win / half_life)` (half_life = 30 days, tunable via governance).
+- **Winner-heavy weighting** + participation dust for recent contributors.
+- **Only genuine new best combined scores** drive strong rewards.
+- Future phases add hybrid model with Breakthrough Bounties (record-setting improvements) and Decaying Top stipends; unclaimed allocations roll to treasury.
 
 ---
 
@@ -240,52 +321,93 @@ Hierarchical seeding and Docker-based reproducibility harness ensure all trainin
 ---
 
 ## Landscape Agent — Symbolic & Causal Compounding
+
 Ingests results and Model Cards from production and high-quality test runs. Extracts symbolic features and applies causal analysis to discover effective training methodologies. ModelingToolkit.jl integration will be used to turn extracted symbolic constraints into structured, usable loss terms.
+
+### Phasing
+- **Phase 0**: PySR symbolic regression → conservation laws, symmetries, invariants → JSON serialization → ModelingToolkit.jl → structured loss terms.
+- **Phase 1**: Double Machine Learning (EconML/Custom JAX) causal inference → strategy choices (loss weights, curriculum, architecture) → robustness outcomes → strategic guidance + specialist distillation.
+- **Phase 2**: Cross-domain causal mapping → transferable insights across physics classes → universal priors.
+
+**Bridge**: JSON serialization first (Python ↔ Julia), JuliaCall later for performance. Structured losses compiled to differentiable JAX loss terms for miner consumption.
 
 ---
 
 ## Detailed Implementation Components
+
+### Core Subnet
 - Stress Generators & StressEvaluator (multi-fidelity support, integrated with trustless generation system)
-- HydrogenScorer (now CarbonScorer)
-- Backbone Registry (dynamic instantiation from JSON)
-- Validator Docker image (model card generator, residual monitoring, trustless data generation)
+- CarbonScorer (multi-objective 45/30/25 + hard gates)
+- Backbone Registry (dynamic instantiation from JSON: FNO, GINO, WNO, Transolver)
+- Validator Docker image (model card generator, residual monitoring, trustless data generation, reproducibility harness)
 - MCP layer (black-box diagnostics with tiers, noisy prior distribution, Estimation Mode support)
-- Miner Toolkit (local training templates, Estimation Mode, cost estimation)
-- generate_challenge()
-- Reproducibility Harness
+- Miner Toolkit (local training templates, Estimation Mode, cost estimation, air-gapped mode)
+- `generate_challenge()` factory for Sponsored Challenges
+- Reproducibility Harness (hierarchical seeding, Docker determinism)
 - Trustless Verification and Data Generation System (see dedicated document)
+
+### Landscape Agent Pipeline
+- PySR symbolic regression (batch, JAX-compatible)
+- Double ML causal inference (Phase 1)
+- ModelingToolkit.jl bridge (JSON → structured loss terms)
+- Specialist Bank (distilled reusable components)
+- Prior distribution engine (noisy priors → miners)
 
 ---
 
 ## Phased Roadmap (Build-Level)
 
-**Phase 0**:
-- Black-box diagnostics with clear diagnostic tiers
-- Noisy prior distribution + Estimation Mode
-- Miner Toolkit Docker image
+**Phase 0 (Months 0-4)**:
+- Black-box diagnostics with clear diagnostic tiers (reputation-gated)
+- Noisy prior distribution + Estimation Mode (anchored to noisy priors)
+- Miner Toolkit Docker image with local support and basic Python interface
 - Light Training templates + local multi-fidelity evaluation
-- Direct submission path
-- Basic cost estimation
+- Direct submission path (always available)
+- Basic cost estimation for rented compute
 - Trustless procedural data generation system (open generator + public seeding)
+- **7 Phase 0 PDE generators + FEniCS validation harness**
+- **3 Backbones (FNO, GINO, WNO) in JAX**
+- **Physics Gates 1-5 implemented + calibrated**
+- **Model Card Generator + ONNX Export + Verification Registry write**
+- **5 Genesis Contracts deployed (testnet → mainnet)**
+- **5 Validators live (10× H100)**
+- **Model Zoo API v1 (7 specialists) + 3 Pilot Subscribers**
 
-**Phase 1**:
+**Phase 0.5 (Months 4-8)**:
+- **6 Defense Benchmark Generators** (NACA 0012, CRM, HIFiRE-1, FSI 3D, Store Separation, Turbine CHT)
+- **Generator validation vs. reference solvers (SU2/OpenFOAM/preCICE) published**
+- **Phase 0.5 challenges live on subnet**
+- **Model Zoo: 15 specialists (7 academic + 8 defense-relevant)**
+
+**Phase 1 (Months 6-12)**:
 - ModelingToolkit.jl integration for structured losses from PySR
-- Stronger strategic guidance from Landscape Agent
-- Initial scoped Abaqus ingestion
-- Cloud rental integration (Targon + Chutes first)
+- Stronger strategic guidance generation from Landscape Agent (PySR → loss terms)
+- Initial scoped Abaqus ingestion utilities (ODB → mesh + fields)
+- Cloud rental integration (Targon + Chutes prioritized)
 - Enhanced trustless verification features (commit-reveal seeding, stronger generator validation)
+- **First Sponsored Challenge LOIs (Tier 2/3)**
+- **Prime Teaming Agreement signed**
+- **SBIR Phase I submitted via Prime**
+- **Verification Gas pricing enabled (first partner integration)**
+- **Air-Gapped Miner Toolkit v1**
 
-**Phase 2+**:
-- Cross-domain causal mapping
-- Advanced agent tooling
-- Multi-asset emissions features
-- Advanced gaming resistance mechanisms
+**Phase 2 (Months 12-24)**:
+- Cross-domain causal mapping via Double Machine Learning
+- Advanced agent tooling and multi-asset emissions features
+- Advanced gaming resistance mechanisms for trustless verification
+- Verified multi-physics benchmarks (FSI, CHT, Thermo-Elasticity) with preCICE
+- **Tier 4 Private/On-Prem deployments**
+- **SBIR Phase II awarded**
+
+**Phase 3 (Months 24-36)**:
+- 3D multi-physics (FSI, CHT, Thermo-elasticity with turbulence)
+- 3D-specific gates (vorticity, boundary layers, turbulence spectra)
+- Curriculum progression from 2D specialists
+- Advanced confidential computing integration
+- **$10M+ ARR target**
 
 ---
 
 ## Scientific Defensibility & Competitive Differentiation
+
 All extensions are designed to be scientifically grounded, reproducible, and auditable while enabling faster discovery of superior Neural Operator training methodologies. The Trustless Verification and Data Generation System is a core part of this defensibility, replacing authority-based trust with verifiable, publicly inspectable mechanisms.
-
----
-
-*This specification is written to be scientifically rigorous and buildable. Reference the implementation in `neurons/` and supporting design documents for concrete code.*
