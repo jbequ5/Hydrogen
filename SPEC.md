@@ -78,25 +78,6 @@ The following three capabilities are prioritized for the initial design because 
 
 MCP diagnostics returned to miners and agents will be deliberately limited. Only objective scores, gate pass/fail status, and high-level category feedback will be provided. Precise geometric, spectral, or spatial hotspot information will not be exposed. This is a core architectural decision to protect the hidden stress distribution and prevent reverse-engineering of the validator's evaluation data.
 
-**Diagnostic Tier Definitions (Reputation-Gated, Not Stake-Gated):**
-
-| Tier | Access | Gate | Reputation Threshold |
-|------|--------|------|---------------------|
-| **Basic** | Objective scores + overall gate status + high-level category | Free (all miners) | 0 |
-| **Intermediate** | High-level failure categories + spectral hints + envelope warnings | Reputation ≥ 0.65 | 0.65 |
-| **Rich** | Spatial hotspots + causal snippets + priority queue | Reputation ≥ 0.85 + validator nomination | 0.85 |
-
-**Reputation Score Formula:**
-```
-reputation = 0.4 × gate_pass_rate_30d + 0.3 × challenge_win_rate_90d + 0.2 × consistency_score + 0.1 × recency_weight
-```
-- `gate_pass_rate_30d`: Fraction of submissions passing all gates in last 30 days
-- `challenge_win_rate_90d`: Fraction of challenges where miner held top-3 position in last 90 days
-- `consistency_score`: 1 - (std_dev_of_scores / mean_score) over last 20 submissions
-- `recency_weight`: Exponential decay, half-life = 14 days
-
-Staking reserved for Partners/Enterprises only (see Partner Staking mechanism).
-
 ### 2. Noisy Prior Distribution + Estimation Mode
 
 The system will distribute only noisy / perturbed versions of the current best strategies (never the clean champion). An Estimation Mode will be provided that allows near-zero-cost screening of new strategy ideas using fast approximations anchored to the noisy prior. This enables both human miners and autonomous agents to run fast, Autoresearch-style iteration loops with minimal friction while maintaining strong protection of the collective intelligence moat.
