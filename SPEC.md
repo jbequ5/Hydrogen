@@ -426,30 +426,23 @@ Centralized teams explore this space linearly. Carbon is designed to explore it 
 
 ---
 
-# Updated Challenges by Phase Section (Rigorous)
+# Challenges by Phase (Optimal Roadmap — Rigorous)
 
 ---
 
-# Updated Challenges by Phase Section (Physics + Implementation Rigor)
+## Phase Transition Criteria (Capability-Gated)
 
----
+| Phase Transition | Entry Gate (ALL Required) | Meaning for Carbon |
+|-----------------|---------------------------|-------------------|
+| **Phase 0 → 1A** | 5 validators live (99% uptime), 7 PDE generators mesh-converged vs FEniCS, 3 backbones running, Model Zoo API v1 live, 3 pilot subscribers | **Subnet operational** — trustless verification layer live |
+| **Phase 1A → 1B** | 2 defense benchmarks live (mesh-converged, turbulence UQ), Factory v1 operational, 1+ Tier 2 LOI, Turbulence UQ framework | **Compressible flow verified** — Factory revenue engine live |
+| **Phase 1B → 2A** | 4 defense benchmarks live (turb UQ + chem UQ), Factory hardened (2 Tier 2 LOIs, 1 Tier 3 LOI), Prime teaming signed, SBIR Phase I submitted | **Defense breadth + Factory hardened** — SBIR pipeline live |
+| **Phase 2A → 2B** | Schema v1.1 live (LoRA + Custom Data + MT Losses), Specialist Bank v1 (20+ components), DML guidance flowing (3 effects), 10 commercial Tier 1 subs | **Customization + Intelligence live** — Deep customization revenue |
+| **Phase 2B → 3** | Air-Gapped Toolkit v1 in 2+ enclaves, Air-Gapped Validator v1 in IL5, preCICE sidecar architected & tested on sequential FSI, Coupling convergence framework validated | **Classified-ready + Coupling architected** — Tier 4 + Coupling ready |
+| **Phase 3 → 4** | 3 coupled benchmarks live (coupling gates passing), preCICE sidecar production on 5 validators, SBIR Phase II awarded, 2+ Tier 4 composite deals | **Coupled physics supply chain live** — SBIR II + Tier 4 composite |
+| **Phase 4 → 5** | 4 3D turbulence benchmarks live (gates passing), 3D curriculum proven (2D→3D→Turb→Coupled), 2+ Tier 4 production contracts, $10M+ ARR run rate | **Production-grade 3D turbulence** — Weapon-system / Digital Twin ready |
 
-## Challenges by Phase (Specific Problem Definitions)
-
-Carbon's challenge progression follows a **capability ladder**: each phase unlocks new physics complexity, new challenge types, and new revenue vectors. The phase transitions are **governed by validator capability gates** — not calendar dates.
-
----
-
-## Phase Transition Criteria
-
-| Phase | Entry Gate | Meaning for Carbon |
-|-------|------------|-------------------|
-| **Phase 0 → 1** | 5 validators live, 7 PDE generators validated vs FEniCS (mesh-converged), 3 backbones running, Model Zoo API v1 live | **Subnet operational** — public verification layer live |
-| **Phase 1 → 2** | 6 defense benchmarks live (mesh-converged, turbulence UQ quantified), Sponsored Challenge Factory operational, 2+ Tier 2/3 LOIs, ModelingToolkit bridge functional | **Revenue engine live** — custom challenges + structured losses |
-| **Phase 2 → 3** | preCICE coupling verified (coupling convergence studied), FSI/CHT/Thermo-Elasticity benchmarks live, Specialist Bank v1 deployed, DML guidance flowing | **Multi-physics verified** — coupled physics supply chain |
-| **Phase 3 → 4** | 3D turbulence gates calibrated (spectra/vorticity/BL), 3D curriculum from 2D specialists working, Tier 4 deployments operational | **Production-grade** — weapon-system / digital twin ready |
-
-> **Phase jumps are capability-gated, not calendar-gated.** Carbon advances when the validator network proves it can handle the next complexity tier.
+> **Phase jumps are capability-gated, not calendar-gated.** Carbon advances when the validator network proves it can handle the next complexity tier. Timelines below are estimates only.
 
 ---
 
@@ -458,9 +451,11 @@ Carbon's challenge progression follows a **capability ladder**: each phase unloc
 | Phase | Name | Physics Scope | Challenge Types | Schema | Revenue |
 |-------|------|---------------|-----------------|--------|---------|
 | **0** | **Foundation** | 7 Academic PDEs | Base (7) | v1.0 | Model Zoo (Tier 1) |
-| **1** | **Defense & Custom** | 7 Academic + 6 Defense | Base (13) + **Hosted (Factory)** | v1.0 | Tier 1 + **Tier 2/3** |
-| **2** | **Customization & Structure** | 13 + Custom | Base + **Hosted + LoRA + Custom Data** | v1.1 | Tier 1-3 + **LoRA/MT** |
-| **3** | **Multi-Physics** | Coupled Physics | Base + Hosted + **Composite (v2.0)** | v2.0 | **Tier 4 + SBIR II** |
+| **1A** | **Compressible Flow** | 7 Academic + 2 Defense | Base (9) + **Hosted (Factory v1)** | v1.0 | Tier 1 + **Tier 2** |
+| **1B** | **Reacting Flow + Sequential FSI** | 9 + 4 Defense | Base (13) + **Hosted (Factory v1 hardened)** | v1.0 | Tier 1-3 + **Tier 3** |
+| **2A** | **Customization & Intelligence** | 13 + Custom | Base + **Hosted + LoRA + Custom Data + MT Losses** | v1.1 | Tier 1-3 + **LoRA/MT** |
+| **2B** | **Air-Gap + Coupling Prep** | 13 + Custom | Base + Hosted + **Air-Gap + preCICE Arch** | v1.1 | **Tier 4 Pilot** |
+| **3** | **Multi-Physics Coupling** | Coupled Physics | Base + Hosted + **Composite (v2.0)** | v2.0 | **Tier 4 + SBIR II** |
 | **4** | **Production** | 3D + Turbulence | All + **3D/Turbulence** | v2.0+ | **Tier 4 + Production** |
 
 ---
@@ -523,13 +518,6 @@ convergence_study:
 
 **Each includes**: Public training/holdout splits, hidden stress configs, symbolic metadata, mesh/temporal convergence reports.
 
-### Hosted Challenges
-| Type | Available | Notes |
-|------|-----------|-------|
-| **Base** | ✅ 7 challenges | Core subnet benchmarks |
-| **Hosted (Factory)** | ❌ | Factory not yet built |
-| **LoRA/Custom** | ❌ | Phase 2+ |
-
 ### Physics Gate Thresholds (Mesh-Converged)
 
 | Gate | Threshold | Derivation |
@@ -547,7 +535,7 @@ convergence_study:
 |------|-----------|-------|
 | **Base** | ✅ 7 challenges | Core subnet benchmarks |
 | **Hosted (Factory)** | ❌ | Factory not yet built |
-| **LoRA/Custom** | ❌ | Phase 2+ |
+| **LoRA/Custom** | ❌ | Phase 2A+ |
 
 ### What This Phase Means for Carbon
 - **Subnet goes live** — 5 validators, 7 PDEs, 3 backbones (FNO/GINO/WNO)
@@ -556,171 +544,96 @@ convergence_study:
 - **Miner tooling complete** — Estimation Mode, Light Training, MCP, SDK
 - **Genesis contracts deployed** — Treasury, BountyPool, Registry, Gas, Staking
 
-**Exit Criteria**: 5 validators live, 7 PDEs validated vs FEniCS (mesh-converged), Model Zoo API v1 with 3 pilot subscribers.
+**Exit Criteria**: 5 validators live (99% uptime), 7 PDEs validated vs FEniCS (mesh-converged), Model Zoo API v1 with 3 pilot subscribers ($10k each), 3 Tier 1 LOIs.
 
 ---
 
-## Phase 1: Defense & Custom (Months 4-12)
-**Status**: *Revenue Engine Live + Defense Credibility*
+## Phase 1A: Compressible Flow (Months 4-8)
+**Status**: *Transonic/Compressible Regime + Factory MVP*
 
-### Base Challenges (13 = 7 Academic + 6 Defense)
+### Base Challenges (9 = 7 Academic + 2 Defense)
 
 | ID | Benchmark | Physics | Key Physics | Reference |
 |----|-----------|---------|-------------|-----------|
 | 1-7 | Phase 0 PDEs | As above | As above | As above |
 | 8 | **NACA 0012 Transonic Flutter** | 2D/3D Compressible NS | Shock-BL interaction, flutter | NASA TP-2001-211214 |
 | 9 | **NASA CRM Wing-Body** | 3D RANS | Transonic separation, buffet | AIAA DPW |
-| 10 | **HIFiRE-1 Scramjet Forebody** | Reacting NS (5-species) | Hypersonic BL transition, chemistry | AFRL HIFiRE |
-| 11 | **Turek/Hron FSI 3D** | NS + Elasticity (preCICE) | FSI, large displacement | FSI Benchmark |
-| 12 | **Store Separation (6-DOF)** | NS + Rigid Body Dynamics | Moving boundaries, dynamic mesh | AF SEEK EAGLE |
-| 13 | **Turbine Blade Heat Transfer** | Conjugate HT | Film cooling, CHT, rotating frame | NASA C3X |
 
-### Turbulence Model Uncertainty Quantification (Phase 1 Standard)
-
-**Every turbulence-enabled generator must quantify model-form uncertainty:**
+### Turbulence Model Uncertainty Quantification (Phase 1A Standard)
 
 ```yaml
 # Required in turbulence-enabled generator configs
 turbulence_uncertainty:
   models_tested: ["spalart_allmaras", "komega_sst", "realizable_kepsilon"]
-  baseline_model: "spalart_allmaras"  # Used for gate thresholds
+  baseline_model: "spalart_allmaras"
   uncertainty_budget:
-    separation_point: 0.15  # 15% chord uncertainty in separation location
-    skin_friction: 0.10     # 10% Cf uncertainty
-    heat_flux: 0.15         # 15% heat flux uncertainty
-  gate_margin_inclusion: true  # Thresholds include model-form uncertainty
+    separation_point: 0.15
+    skin_friction: 0.10
+    heat_flux: 0.15
+  gate_margin_inclusion: true
   validation:
-    reference_solvers: ["SU2", "OpenFOAM", "DPLR"]
+    reference_solvers: ["SU2", "OpenFOAM", "FUN3D"]
     experimental_data: ["NASA TP-2001-211214", "AIAA DPW"]
-    tolerance_pct: 5.0  # Including model-form uncertainty
+    tolerance_pct: 5.0
 ```
 
-**Gate thresholds include turbulence model-form uncertainty budget.** Threshold = numerical_error + turbulence_uncertainty + 3σ.
+**Gate thresholds include turbulence model-form uncertainty budget.**
 
-### Base Challenges (13 = 7 Academic + 6 Defense)
-
-| ID | Benchmark | Physics | Key Physics | Reference |
-|----|-----------|---------|-------------|-----------|
-| 1-7 | Phase 0 PDEs | As above | As above | As above |
-| 8 | **NACA 0012 Transonic Flutter** | 2D/3D Compressible NS | Shock-BL interaction, flutter | NASA TP-2001-211214 |
-| 9 | **NASA CRM Wing-Body** | 3D RANS | Transonic separation, buffet | AIAA DPW |
-| 10 | **HIFiRE-1 Scramjet Forebody** | Reacting NS (5-species) | Hypersonic BL transition, chemistry | AFRL HIFiRE |
-| 11 | **Turek/Hron FSI 3D** | NS + Elasticity (preCICE) | FSI, large displacement | FSI Benchmark |
-| 12 | **Store Separation (6-DOF)** | NS + Rigid Body Dynamics | Moving boundaries, dynamic mesh | AF SEEK EAGLE |
-| 13 | **Turbine Blade Heat Transfer** | Conjugate HT | Film cooling, CHT, rotating frame | NASA C3X |
-
-### Chemistry Mechanism Specification (HIFiRE)
-
-```yaml
-# HIFiRE-1 Chemistry Specification
-chemistry:
-  mechanism: "GRI-Mech 3.0"  # Explicitly specified
-  species: ["N2", "O2", "NO", "N", "O"]
-  reactions: 325
-  uncertainty:
-    mechanism_form: "GRI-Mech vs Park vs Guardone"
-    rate_coefficient: "±30% (Arrhenius)"
-    validation: "DPLR/US3D comparison + shock tube data"
-```
-
-### Hosted Challenges (Factory Live)
+### Hosted Challenges (Factory v1 Live)
 
 | Type | Available | Schema | Notes |
 |------|-----------|--------|-------|
-| **Base** | ✅ 13 challenges | v1.0 | 7 academic + 6 defense |
-| **Hosted — Tier 2 (Open)** | ✅ Factory | v1.0 | Custom geometry/BCs/envelope on 6 defense physics |
-| **Hosted — Tier 3 (IP-Licensed)** | ✅ Factory | v1.0 | Exclusive license, sponsor owns model |
-| **Hosted — Tier 4 (Private)** | ✅ Factory | v1.0 | Air-gapped validator, sponsor data never leaves |
-| **LoRA/Custom Data** | ❌ | v1.1 | Phase 2 |
+| **Base** | ✅ 9 challenges | v1.0 | 7 academic + 2 defense |
+| **Hosted — Tier 2 (Open)** | ✅ Factory v1 | v1.0 | Custom geometry/BCs/envelope on compressible NS |
+| **Hosted — Tier 3 (IP-Licensed)** | ❌ | v1.0 | Phase 1B |
+| **Hosted — Tier 4 (Private)** | ❌ | v1.0 | Phase 1B+ |
+| **LoRA/Custom Data** | ❌ | v1.1 | Phase 2A |
 
-### Hosted Challenge Structure (v1.0 Schema)
+### Factory v1 Scope (Phase 1A)
 
-```json
-{
-  "challenge_id": "sponsor_lockheed_ns_3d_a1b2c3d4",
-  "name": "Lockheed Transonic Wing",
-  "physics_class": "compressible_ns",
-  "dimension": "3D",
-  "pde": "compressible_navier_stokes",
-  "generator_config": {
-    "geometry_ref": "s3://lockheed/geom/wing_v4.stl",
-    "boundary_conditions": {
-      "wall": "adiabatic_no_slip",
-      "farfield": "riemann_invariant"
-    },
-    "flight_envelope": {
-      "mach": [0.7, 1.2],
-      "reynolds": [1e6, 10e6],
-      "angle_of_attack": [-5, 10]
-    },
-    "turbulence_model": "spalart_allmaras",
-    "turbulence_uncertainty": {
-      "models_tested": ["spalart_allmaras", "komega_sst"],
-      "uncertainty_budget": {"separation_point": 0.15, "heat_flux": 0.15}
+```python
+# carbon/challenges/factory.py (Phase 1A Scope)
+SUPPORTED_PHYSICS_CLASSES_1A = {
+    "compressible_ns": {
+        "pde": "compressible_navier_stokes",
+        "turbulence_models": ["spalart_allmaras", "komega_sst"],
+        "dimensions": ["2D", "3D"],
+        "generator_params": ["mach", "reynolds", "aoa", "turbulence_model"]
     }
-  },
-  "backbone_whitelist": ["fno", "gino", "wno"],
-  "gate_thresholds": { 
-    "mass": 1e-5, 
-    "energy": 1e-5, 
-    "boundary": 1e-4, 
-    "shock_capture": 0.05,
-    "turbulence_uncertainty_budget": {"separation": 0.15, "heat_flux": 0.15}
-  },
-  "scoring_weights": { "physics_fidelity": 45, "robustness": 30, "accuracy": 25 }
 }
+
+def create_sponsored_challenge_1a(request: SponsoredChallengeRequest) -> ChallengeSpec:
+    """Factory v1: Compressible NS only, v1.0 schema."""
+    # Validates physics_class in SUPPORTED_PHYSICS_CLASSES_1A
+    # Auto-calibrates gates with turbulence UQ budget
+    # Returns v1.0 ChallengeSpec
 ```
 
-### Miner Submission: **Zero Changes**
+### Miner Submission: **Zero Changes** (v1.0 Schema)
 
-```json
-{
-  "challenge_id": "sponsor_lockheed_ns_3d_a1b2c3d4",
-  "backbone": "gino",
-  "backbone_config": { ... },
-  "training": { ... },
-  "loss": { ... },
-  "curriculum": [...],
-  "data": { ... }
-}
-```
-
-**Miner Toolkit, MCP, SDK — zero changes required.**
-
-### Physics Gate Updates for Phase 1
+### Physics Gate Updates for Phase 1A
 
 | Gate | Threshold | Addition |
 |------|-----------|----------|
 | Mass Conservation | `1e-6` L2 + `1e-4` Linf | + shock-local Linf |
 | Energy Stability | `1e-6` | Split: numerical vs physical dissipation |
-| Boundary Satisfaction | `1e-4` Linf | + catalytic wall for reacting |
+| Boundary Satisfaction | `1e-4` Linf | — |
 | Shock Capture | `Δx/shock_thickness < 0.1` | Resolution-based metric |
-| Species Conservation | `1e-4` per-species | Per-species + total mass |
 | Turbulence UQ | Model-form budget included | Gate margin = num_err + turb_UQ + 3σ |
 | Rollout Stability | 10k steps, 1% perturb | Lyapunov < 0 |
 | UQ Calibration | Conformal 95% | Split conformal, 500 pts |
 
-### Adjoint Consistency Gate (Phase 1+)
+### Adjoint Consistency Gate (Phase 1A+)
 
 ```python
 # carbon/validator/physics_gates.py
 @jit
 def adjoint_consistency_gate(model_fn, challenge, params, tol=1e-4):
-    """
-    Verify adjoint consistency for optimization-grade surrogates.
-    Checks: ∇_θ J(θ) ≈ adjoint_solution
-    """
-    # Forward pass
+    """Verify adjoint consistency for optimization-grade surrogates."""
     primal_out = model_fn(params)
-    
-    # Adjoint solve (reverse mode autodiff)
     adj_grad = jax.grad(lambda p: objective(model_fn(p)))(params)
-    
-    # Finite difference check
     fd_grad = finite_difference_gradient(model_fn, params)
-    
     rel_error = jnp.linalg.norm(adj_grad - fd_grad) / (jnp.linalg.norm(fd_grad) + 1e-12)
-    
     return GateResult(
         gate_id="adjoint_consistency",
         threshold=1e-4,
@@ -729,39 +642,165 @@ def adjoint_consistency_gate(model_fn, challenge, params, tol=1e-4):
     )
 ```
 
-**Required for Phase 2+ optimization-grade surrogates.**
+**Required for Phase 2A+ optimization-grade surrogates.**
 
-### What Changes in Phase 1
+### What Changes in Phase 1A
 
-| Aspect | Phase 0 | Phase 1 | Change |
-|--------|---------|---------|--------|
-| **Physics Scope** | 7 academic PDEs | 13 PDEs (7 academic + 6 defense) | +6 defense benchmarks |
-| **Hosted Challenges** | None | **Factory live** (Tier 2/3/4) | **Revenue engine** |
+| Aspect | Phase 0 | Phase 1A | Change |
+|--------|---------|----------|--------|
+| **Physics Scope** | 7 academic PDEs | 9 PDEs (7 academic + 2 defense) | +2 compressible benchmarks |
+| **Hosted Challenges** | None | **Factory v1 live** (Tier 2) | **Revenue engine** |
 | **Schema** | v1.0 | v1.0 | **Frozen** |
-| **Revenue** | Tier 1 only | **Tier 1 + Tier 2/3/4** | **First $200k+ deals** |
-| **DoD GTM** | Benchmarks only | **Live sponsored challenges** | **Prime partnerships** |
+| **Revenue** | Tier 1 only | **Tier 1 + Tier 2** | **First $150k+ deals** |
+| **DoD GTM** | Benchmarks only | **Live sponsored challenges** | **Factory revenue** |
 | **Landscape Agent** | PySR only | PySR + **MT bridge** | Structured loss terms |
-| **Physics Rigor** | Mesh convergence | **+ Turbulence UQ + Adjoint gate** | **Defense-grade rigor** |
+| **Physics Rigor** | Mesh convergence | **+ Turbulence UQ + Adjoint gate** | **Compressible rigor** |
 
 ### What This Phase Means for Carbon
-- **Revenue engine live** — Sponsored Challenge Factory operational, first Tier 2/3 LOIs
-- **Defense credibility proven** — 6 weapon-relevant benchmarks live, validated vs SU2/OpenFOAM/DPLR with turbulence UQ
-- **Prime partnerships signed** — Teaming agreements with Shield AI/Anduril/EpiSci for SBIR
+- **Factory revenue live** — Sponsored Challenge Factory v1 operational, first Tier 2 LOI
+- **Compressible flow credibility** — 2 weapon-relevant benchmarks live, turb UQ quantified
+- **Model Zoo expands** — 9 specialists (7 academic + 2 defense)
 - **ModelingToolkit bridge live** — PySR → MT → JAX loss terms feeding miners
-- **SBIR Phase I submitted** — Via prime partner
+- **Validator economics validated** — α/TAO floor tested at 0.005
 
-**Exit Criteria**: 2+ Tier 2/3 LOIs signed, Prime teaming agreement, SBIR Phase I submitted, ModelingToolkit bridge producing loss terms, turbulence UQ quantified for all defense benchmarks.
+**Exit Criteria**: 2 defense benchmarks live (mesh-converged, turb UQ), Factory v1 operational, 1+ Tier 2 LOI signed, Turbulence UQ framework published, 5 Model Zoo subscribers ($50k ARR), Validator economics validated at α/TAO ≥ 0.005.
 
 ---
 
-## Phase 2: Customization & Structure (Months 12-24)
-**Status**: *Structured Intelligence + Customer-Owned Customization*
+## Phase 1B: Reacting Flow + Sequential FSI (Months 8-14)
+**Status**: *Reacting Flow + Sequential FSI + Factory Hardened*
+
+### Base Challenges (13 = 9 + 4 Defense)
+
+| ID | Benchmark | Physics | Key Physics | Reference |
+|----|-----------|---------|-------------|-----------|
+| 1-9 | Phase 1A PDEs | As above | As above | As above |
+| 10 | **HIFiRE-1 Scramjet Forebody** | Reacting NS (5-species) | Hypersonic BL transition, chemistry | AFRL HIFiRE |
+| 11 | **Turek/Hron FSI 3D (Sequential)** | NS + Elasticity (one-way) | FSI, large displacement | FSI Benchmark |
+| 12 | **Store Separation (6-DOF)** | NS + Rigid Body Dynamics | Moving boundaries, dynamic mesh | AF SEEK EAGLE |
+| 13 | **Turbine Blade Heat Transfer** | Conjugate HT | Film cooling, CHT, rotating frame | NASA C3X |
+
+### Chemistry Mechanism Specification (HIFiRE)
+
+```yaml
+chemistry:
+  mechanism: "GRI-Mech 3.0"
+  species: ["N2", "O2", "NO", "N", "O"]
+  reactions: 325
+  uncertainty:
+    mechanism_form: "GRI-Mech vs Park vs Guardone"
+    rate_coefficient: "±30% (Arrhenius)"
+    validation: "DPLR/US3D comparison + shock tube data"
+```
+
+### Sequential FSI Specification (Phase 1B)
+
+```yaml
+# Sequential FSI (one-way coupling, no iteration)
+fsi_sequential:
+  fluid_solve: "compressible_ns"  # or incompressible
+  solid_solve: "nonlinear_elasticity"
+  coupling: "one_way"  # fluid → solid loads, no feedback
+  data_mapping: "nearest_neighbor"
+  validation:
+    reference: "OVERFLOW/FUN3D + CalculiX (one-way)"
+    cases: 15
+```
+
+### Chemistry Uncertainty Quantification (HIFiRE)
+
+```yaml
+chemistry_uncertainty:
+  mechanisms_tested: ["GRI-Mech_3.0", "Park_1993", "Guardone_2005"]
+  baseline_mechanism: "GRI-Mech_3.0"
+  uncertainty_budget:
+    heat_flux: 0.20
+    species_concentration: 0.25
+    surface_recession: 0.30
+  gate_margin_inclusion: true
+```
+
+### Hosted Challenges (Factory v1 Hardened)
+
+| Type | Available | Schema | Notes |
+|------|-----------|--------|-------|
+| **Base** | ✅ 13 challenges | v1.0 | 7 academic + 6 defense |
+| **Hosted — Tier 2 (Open)** | ✅ Factory v1 | v1.0 | All 6 defense physics classes |
+| **Hosted — Tier 3 (IP-Licensed)** | ✅ Factory v1 | v1.0 | Exclusive license, sponsor owns model |
+| **Hosted — Tier 4 (Private)** | ✅ Factory v1 | v1.0 | Air-gapped validator, sponsor data never leaves |
+| **LoRA/Custom Data** | ❌ | v1.1 | Phase 2A |
+
+### Factory v1 Hardened Scope
+
+```python
+SUPPORTED_PHYSICS_CLASSES_1B = {
+    **SUPPORTED_PHYSICS_CLASSES_1A,
+    "reacting_ns": {
+        "pde": "reacting_navier_stokes",
+        "chemistry": ["gri_mech_3.0"],
+        "turbulence_models": ["none", "spalart_allmaras"],
+        "dimensions": ["2D_axisymmetric", "3D"]
+    },
+    "fsi_sequential": {
+        "pde": "compressible_ns + nonlinear_elasticity",
+        "coupling": "one_way",
+        "data_mapping": "nearest_neighbor"
+    },
+    "rigid_body_6dof": {
+        "pde": "compressible_ns + rigid_body_dynamics",
+        "coupling": "overset_mesh"
+    },
+    "cht": {
+        "pde": "conjugate_heat_transfer",
+        "turbulence_models": ["komega_sst"],
+        "cooling_models": ["film_cooling"]
+    }
+}
+```
+
+### Miner Submission: **Zero Changes** (v1.0 Schema)
+
+### Physics Gate Updates for Phase 1B
+
+| Gate | Threshold | Addition |
+|------|-----------|----------|
+| Species Conservation | `1e-4` per-species | Per-species + total mass |
+| Chemistry UQ | Model-form budget included | Gate margin = num_err + chem_UQ + 3σ |
+| Sequential FSI Interface | Traction continuity | 1e-4 velocity jump (one-way) |
+| Trajectory Accuracy | Position error | 0.05m RMS (6-DOF) |
+| Ablation/Recession | Surface recession error | 10% (HIFiRE) |
+
+### What Changes in Phase 1B
+
+| Aspect | Phase 1A | Phase 1B | Change |
+|--------|----------|----------|--------|
+| **Physics Scope** | 2 defense benchmarks | **6 defense benchmarks** | +4 (reacting, FSI, 6-DOF, CHT) |
+| **Factory** | v1 (Compressible) | **v1 Hardened** | +Reacting, Sequential FSI, 6-DOF, CHT |
+| **Tier 3/4** | ❌ | ✅ Factory | **Tier 3/4 revenue** |
+| **Chemistry UQ** | N/A | **Quantified** | **Hypersonic rigor** |
+| **Sequential FSI** | N/A | **One-way coupling** | **FSI intro** |
+| **Prime GTM** | LOIs | **Teaming Agreement + SBIR I** | **Pipeline** |
+| **Commercial** | 5 Tier 1 subs | **3 Commercial Tier 1 subs** | **$100k ARR** |
+
+### What This Phase Means for Carbon
+- **Defense breadth proven** — 6 weapon-relevant benchmarks live, all with UQ
+- **Factory hardened** — Tier 2/3/4 operational on all 6 defense physics classes
+- **Prime partnerships signed** — Teaming agreement with Shield AI/Anduril/EpiSci for SBIR
+- **SBIR Phase I submitted** — Via prime partner
+- **Commercial traction** — 3 Tier 1 subscribers ($100k ARR)
+
+**Exit Criteria**: 4 defense benchmarks live (mesh-converged, UQ quantified), Factory hardened (2 Tier 2 LOIs, 1 Tier 3 LOI), Prime teaming agreement signed, SBIR Phase I submitted via Prime, 3 Commercial Tier 1 subscribers ($100k ARR), Chemistry UQ + Sequential FSI frameworks published.
+
+---
+
+## Phase 2A: Customization & Intelligence (Months 14-22)
+**Status**: *Deep Customization + Structured Intelligence*
 
 ### Base Challenges
 | Type | Count | Notes |
 |------|-------|-------|
-| **Base** | 13 | Same as Phase 1 |
-| **Hosted** | Factory + **LoRA + Custom Data** | Schema v1.1 |
+| **Base** | 13 | Same as Phase 1B |
+| **Hosted** | Factory + **LoRA + Custom Data + MT Losses** | Schema v1.1 |
 
 ### Hosted Challenges (v1.1 Schema)
 
@@ -777,13 +816,13 @@ def adjoint_consistency_gate(model_fn, challenge, params, tol=1e-4):
 {
   ...v1.0,
   "schema_version": "1.1",
-  "lora": {                    // NEW: optional
+  "lora": {
     "rank": 16,
     "alpha": 32,
     "target_modules": ["spectral_conv", "projection"],
     "init_scale": 0.01
   },
-  "custom_dataset": {          // NEW: optional
+  "custom_dataset": {
     "source": "abaqus_odb",
     "storage_uri": "s3://bucket/case.odb",
     "field_mapping": {
@@ -793,7 +832,7 @@ def adjoint_consistency_gate(model_fn, challenge, params, tol=1e-4):
     },
     "mesh_handling": "interpolate_to_uniform"
   },
-  "structured_losses": {       // NEW: optional (from Landscape Agent)
+  "structured_losses": {
     "enabled": true,
     "terms_uri": "ipfs://QmXxX/loss_terms.json",
     "weights": {"conservation": 0.3, "symmetry": 0.1}
@@ -801,10 +840,10 @@ def adjoint_consistency_gate(model_fn, challenge, params, tol=1e-4):
 }
 ```
 
-### Landscape Agent Phase 2: Double ML + Specialist Bank
+### Landscape Agent Phase 2A: MT Bridge + Specialist Bank + DML
 
 ```python
-# carbon/landscape/pipeline.py (Phase 2)
+# carbon/landscape/pipeline.py (Phase 2A)
 class LandscapeAgent:
     def __init__(self, config):
         self.pysr_config = config.get("pysr", PYSR_CONFIG)
@@ -813,28 +852,24 @@ class LandscapeAgent:
         self.specialist_bank = SpecialistBank()
         self.prior_engine = PriorEngine()
     
+    def _run_mt_bridge(self):
+        """PySR → ModelingToolkit.jl → JAX loss terms (Production)."""
+        equations = pysr_regress(self.pysr_dataset, self.pysr_config)
+        for eq in equations:
+            loss_term = self.mt_bridge.json_to_loss_term(eq.json)
+            self.specialist_bank.add_loss_term(loss_term)
+        self.prior_engine.update_from_symbolic(equations)
+    
     def _run_dml(self):
-        """Double ML causal inference — Phase 2."""
-        # Treatment: discretized strategy choices
-        #   - loss_weight_config (binned)
-        #   - curriculum_type (categorical)
-        #   - backbone_family (categorical)
-        #   - lr_schedule_type (categorical)
-        # Outcome: robustness_score (continuous)
-        # Confounders: physics_class, data_seed, backbone, epochs
-        
+        """Double ML causal inference — JAX-native (Phase 2A)."""
         causal_effects = double_ml_jax(
             treatment=self.dml_dataset["treatment"],
             outcome=self.dml_dataset["outcome"],
             confounders=self.dml_dataset["confounders"],
             config=self.dml_config
         )
-        
-        # Generate structured guidance
         guidance = self._generate_guidance(causal_effects)
         self.prior_engine.update_from_causal(guidance)
-        
-        # Update specialist bank with causal components
         for effect in causal_effects:
             if effect.confidence > 0.9:
                 self.specialist_bank.add_causal_component(effect)
@@ -843,11 +878,10 @@ class LandscapeAgent:
 ### Double ML Configuration (JAX-Native)
 
 ```python
-# carbon/landscape/dml_config.py
 DML_CONFIG = {
     "n_folds": 5,
     "n_repeats": 3,
-    "ml_model": "jax_boosting",  # JAX-native gradient boosting
+    "ml_model": "jax_boosting",
     "treatment_types": {
         "loss_weights": "continuous_multivariate",
         "curriculum": "categorical",
@@ -861,28 +895,17 @@ DML_CONFIG = {
 }
 ```
 
-### Specialist Bank Structure
+### Specialist Bank v1
 
 ```python
-# carbon/landscape/specialist_bank.py
 class SpecialistBank:
     def __init__(self):
-        self.loss_terms = {}      # MT-structured loss terms
-        self.encoders = {}        # Reusable encoder modules
-        self.boundary_handlers = {}  # BC-specific modules
-        self.causal_components = {}  # High-confidence causal effects
-    
-    def add_loss_term(self, term: MTLossTerm):
-        key = f"{term.physics_class}_{term.conservation_type}"
-        self.loss_terms[key] = term
-    
-    def add_causal_component(self, effect: CausalEffect):
-        if effect.confidence > 0.9:
-            key = f"{effect.treatment}→{effect.outcome}"
-            self.causal_components[key] = effect
+        self.loss_terms = {}
+        self.encoders = {}
+        self.boundary_handlers = {}
+        self.causal_components = {}
     
     def get_specialist_for_challenge(self, challenge: str) -> SpecialistPackage:
-        """Assemble specialist package for a challenge."""
         return SpecialistPackage(
             loss_terms=self._select_relevant_loss_terms(challenge),
             encoders=self._select_encoders(challenge),
@@ -891,38 +914,93 @@ class SpecialistBank:
         )
 ```
 
-### What Changes in Phase 2
+### What Changes in Phase 2A
 
-| Aspect | Phase 1 | Phase 2 | Change |
-|--------|---------|---------|--------|
+| Aspect | Phase 1B | Phase 2A | Change |
+|--------|----------|----------|--------|
 | **Schema** | v1.0 | **v1.1** | +LoRA, +Custom Data, +MT Losses |
 | **Customization** | Geometry/BCs/Envelope | **+LoRA + Custom Data + MT Losses** | **Deep customization** |
-| **Landscape Agent** | PySR + MT Bridge | **+ Double ML (JAX)** | **Causal guidance** |
+| **Landscape Agent** | PySR + MT Bridge | **+ MT Production + DML (JAX)** | **Causal guidance** |
 | **Specialist Bank** | Concept | **v1 Deployed** | Reusable components |
-| **Air-Gapped Toolkit** | Design | **v1 Deployed** | **Tier 4 operational** |
-| **Revenue** | Tier 1-3 | **Tier 1-3 + LoRA premium** | **Higher ARPU** |
+| **Revenue** | Tier 1-3 | **Tier 1-3 + LoRA/MT premium** | **Higher ARPU** |
+| **Commercial** | 3 Tier 1 subs | **10 Tier 1 subs** | **$300k ARR** |
 
 ### What This Phase Means for Carbon
 - **Structured intelligence deployed** — MT loss terms + DML causal guidance flow to miners
 - **Customer-owned customization** — LoRA + custom data + MT losses = deep specialization
-- **Air-gapped Tier 4 operational** — Classified enclave fine-tuning with Carbon tooling
-- **Specialist Bank v1** — Reusable components (encoders, spectral layers, boundary handlers)
-- **DML causal guidance live** — Miners receive "loss schedule X → robustness +0.12" guidance
+- **SBIR Phase I awarded** — $250k via prime
+- **Commercial flywheel** — 10 Tier 1 subscribers ($300k ARR)
 
-**Exit Criteria**: Specialist Bank v1 with 20+ components, DML guidance flowing, Air-Gapped Toolkit v1 in 2+ enclaves, Tier 4 revenue.
+**Exit Criteria**: Specialist Bank v1 with 20+ components, MT loss terms in miner hands, DML guidance flowing (3 high-confidence effects), 10 commercial Tier 1 subscribers ($300k ARR), 2 Tier 3 deals using LoRA, SBIR Phase I awarded.
 
 ---
 
-## Phase 3: Multi-Physics (Months 24-36)
-**Status**: *Coupled Physics Supply Chain*
+## Phase 2B: Air-Gap + Coupling Prep (Months 22-28)
+**Status**: *Classified Ready + Coupling Architecture*
 
-### preCICE Coupling Architecture (Phase 0 Design Decision)
+### Base Challenges
+| Type | Count | Notes |
+|------|-------|-------|
+| **Base** | 13 | Same as Phase 2A |
+| **Hosted** | Factory + Air-Gap + preCICE Arch | Schema v1.1 |
 
-**Validator-side preCICE integration via sidecar pattern:**
+### Hosted Challenges (v1.1 Schema)
+
+| Tier | New Capabilities | Schema |
+|------|------------------|--------|
+| **Tier 4** | **Air-Gapped Miner Toolkit v1** — full fine-tuning in enclave | v1.1 |
+| **Tier 4** | **Air-Gapped Validator v1** — validator in IL5 enclave | v1.1 |
+| **Tier 3/4** | **preCICE Sidecar Architecture** tested on sequential FSI | v1.1 |
+
+### Air-Gapped Miner Toolkit v1
+
+```python
+# carbon/toolkit/airgapped.py
+class AirgappedMinerToolkit:
+    """Full Carbon toolkit for IL5/IL6 enclaves. Zero network deps."""
+    
+    def __init__(self, strategy_json_path: Path, prior_weights_path: Path):
+        self.strategy = self._load_strategy(strategy_json_path)
+        self.prior_weights = self._load_weights(prior_weights_path)
+        self.device = self._detect_device()
+    
+    def fine_tune(self, classified_dataset: Path, epochs: int = 100, physics_gates: bool = True) -> FineTuneResult:
+        train_loader, val_loader = self._load_classified_data(classified_dataset)
+        model = self._build_model()
+        model.load_state_dict(self.prior_weights, strict=False)
+        
+        for epoch in range(epochs):
+            train_loss = self._train_epoch(model, train_loader)
+            if physics_gates and epoch % 10 == 0:
+                gate_results = self._run_local_physics_gates(model, val_loader)
+                if not all(g['status'] == 'PASS' for g in gate_results):
+                    warnings.warn(f"Gate regression at epoch {epoch}")
+        
+        return FineTuneResult(
+            onnx_path=self._export_onnx(model),
+            model_card=self._generate_updated_model_card(model),
+            final_weights=model.state_dict()
+        )
+```
+
+### Air-Gapped Validator v1
+
+```yaml
+# validator/airgapped_config.yaml
+airgapped_validator:
+  deployment: "IL5_enclave"
+  network: "none"  # Fully air-gapped
+  seeding: "pre_provisioned_seed_bundle"  # No block hash
+  verification_registry: "local_write_only"  # Sync via CDS later
+  model_registry: "local_only"
+  slurm_integration: true  # HPC scheduler
+```
+
+### preCICE Sidecar Architecture (Phase 0 Design → Phase 2B Implementation)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    VALIDATOR DOCKER                          │
+│                    VALIDATOR DOCKER (Phase 2B)               │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌──────────────┐     gRPC/Unix Socket      ┌────────────┐  │
@@ -935,18 +1013,23 @@ class SpecialistBank:
 │  │  (Solid)     │◄────────────────────────────────┘         │
 │  └──────────────┘                                          │
 │                                                              │
+│  Deterministic Coupling:                                     │
+│  ├── Shared master_seed (pre-provisioned in air-gap)        │
+│  ├── Synchronized checkpointing (Orbax + preCICE)           │
+│   └── Coupling convergence monitoring (gRPC streaming)      │
+│                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Coupling Convergence Study (Phase 3 Standard)
+### Coupling Convergence Framework (Phase 2B Validation)
 
 ```yaml
-# Required for Phase 3 generators
+# carbon/generators/coupling_convergence.yaml
 coupling_convergence:
   study:
     max_iterations: [10, 20, 40, 80]
     convergence_tolerance: [1e-4, 1e-5, 1e-6, 1e-7]
-    coupling_scheme: "implicit"  # or explicit
+    coupling_scheme: "implicit"
   metrics:
     interface_residual: "L2_norm"
     displacement_jump: "Linf_norm"
@@ -957,7 +1040,42 @@ coupling_convergence:
   validation:
     reference: "preCICE + OpenFOAM + CalculiX"
     cases: 15
+    mode: "sequential_fsi"  # Validate on one-way first
 ```
+
+### Sequential Multi-Physics Ladder (Phase 2B → 3 Bridge)
+
+| Step | Physics | Coupling | Purpose |
+|------|---------|----------|---------|
+| **1** | CHT (Sequential) | Fluid → Thermal (one-way) | Thermal loads on structure |
+| **2** | Thermo-Elasticity (Sequential) | Thermal → Structural (one-way) | Thermal stress |
+| **3** | FSI (Sequential) | Fluid → Solid (one-way) | Pressure loads |
+| **4** | FSI (Coupled) | preCICE implicit | Full two-way |
+| **5** | CHT (Coupled) | preCICE explicit | Conjugate HT |
+| **6** | Thermo-Elasticity (Coupled) | preCICE multi-field | Full multi-physics |
+
+### What Changes in Phase 2B
+
+| Aspect | Phase 2A | Phase 2B | Change |
+|--------|----------|----------|--------|
+| **Air-Gap** | Design | **Toolkit v1 + Validator v1 deployed** | **Tier 4 operational** |
+| **Coupling** | Design | **preCICE sidecar architected + tested** | **Coupling ready** |
+| **Sequential Multi-Physics** | N/A | **6-step ladder validated** | **Phase 3 de-risked** |
+| **Tier 4** | Pilot | **2+ enclaves live** | **Tier 4 revenue** |
+| **preCICE** | Architecture | **Sidecar production-tested** | **Phase 3 de-risked** |
+
+### What This Phase Means for Carbon
+- **Classified-ready** — Air-gapped toolkit + validator in IL5 enclaves
+- **Coupling de-risked** — preCICE sidecar production-tested on sequential FSI
+- **Sequential multi-physics ladder** — 6-step path to full coupling validated
+- **Tier 4 pilot** — First private challenge in enclave
+
+**Exit Criteria**: Air-Gapped Toolkit v1 in 2+ IL5 enclaves, Air-Gapped Validator v1 in IL5, preCICE sidecar architected & tested on sequential FSI, Coupling convergence framework validated, 1 Tier 4 pilot challenge in enclave.
+
+---
+
+## Phase 3: Multi-Physics Coupling (Months 28-40)
+**Status**: *Coupled Physics Supply Chain*
 
 ### Base Challenges (Composite v2.0)
 
@@ -1014,16 +1132,41 @@ coupling_convergence:
 | **Energy Conservation** | Global energy balance | 1e-5 | Finite volume balance |
 | **Coupling Convergence** | preCICE residual decay | < 1e-6 in 20 iters | Iteration history |
 
+### Hosted Challenge Types (Phase 3)
+
+| Tier | Capability |
+|------|------------|
+| **Tier 3/4** | **Composite challenges** — sponsor defines fluid/solid configs + coupling |
+| **Tier 4** | **Private composite** — air-gapped preCICE coupling in enclave |
+
+### Specialist Bank v2 (Cross-Physics)
+
+```python
+class SpecialistBankV2:
+    def __init__(self):
+        self.interface_handlers = {}    # preCICE data mapping modules
+        self.coupling_layers = {}       # Fluid-solid interface networks
+        self.multi_physics_curricula = {}  # Cross-physics curricula
+    
+    def get_composite_specialist(self, challenge: str) -> CompositeSpecialist:
+        return CompositeSpecialist(
+            fluid_specialist=self.fluid_bank.get(challenge),
+            solid_specialist=self.solid_bank.get(challenge),
+            interface_handler=self._get_interface_handler(challenge),
+            coupling_curriculum=self._get_coupling_curriculum(challenge)
+        )
+```
+
 ### What Changes in Phase 3
 
-| Aspect | Phase 2 | Phase 3 | Change |
-|--------|---------|---------|--------|
+| Aspect | Phase 2B | Phase 3 | Change |
+|--------|----------|---------|--------|
 | **Schema** | v1.1 | **v2.0 (Composite)** | Multi-physics native |
-| **Physics** | Single-physics | **Coupled (preCICE)** | **FSI/CHT/Thermo-Elasticity** |
+| **Physics** | Single + Sequential | **Coupled (preCICE)** | **FSI/CHT/Thermo-Elasticity** |
 | **Backbones** | Single per submission | **Composite (fluid + solid)** | Heterogeneous |
-| **Gates** | Single-physics | **+ Coupling gates** | Cross-physics constraints |
-| **Curriculum** | Single-physics | **Cross-physics (fluid-first)** | Transfer learning |
-| **Revenue** | Tier 1-3 | **Tier 4 + SBIR II** | **$1.5M+ deals** |
+| **Gates** | Single + Sequential | **+ Coupling gates** | Cross-physics constraints |
+| **Curriculum** | Single + Sequential | **Cross-physics (fluid-first)** | Transfer learning |
+| **Revenue** | Tier 1-3 + Tier 4 pilot | **Tier 4 + SBIR II** | **$1.5M+ deals** |
 
 ### What This Phase Means for Carbon
 - **Coupled physics verified** — FSI/CHT/Thermo-Elasticity with preCICE, gates passing
@@ -1032,18 +1175,18 @@ coupling_convergence:
 - **Specialist Bank v2** — Cross-physics components (interface handlers, coupling layers)
 - **Tier 4 pipeline full** — Private composite challenges for prime weapon programs
 
-**Exit Criteria**: 3 multi-physics benchmarks live with coupling gates passing, SBIR Phase II awarded, 2+ Tier 4 composite deals.
+**Exit Criteria**: 3 multi-physics benchmarks live with coupling gates passing, SBIR Phase II awarded ($1.5M), 2+ Tier 4 composite deals signed, preCICE sidecar production on 5 validators.
 
 ---
 
-## Phase 4: Production (Months 36+)
+## Phase 4: Production (Months 40-52)
 **Status**: *Weapon-System / Digital Twin Ready*
 
 ### 3D Turbulence Gates
 
 | Gate | Metric | Threshold | Validation |
 |------|--------|-----------|------------|
-| **Vorticity Preservation** | ||ω_pred - ω_ref|| / ||ω_ref|| | < 0.1 | DNS/LES reference |
+| **Vorticity Preservation** | \|\|ω_pred - ω_ref\|\| / \|\|ω_ref\|\| | < 0.1 | DNS/LES reference |
 | **Boundary Layer Resolution** | y+ error | < 5% | Wall-resolved LES |
 | **Turbulence Spectra Match** | E(k) slope in inertial range | -5/3 ± 0.1 | Experimental/LES |
 | **Separation Prediction** | Separation point error | < 0.05c | Experimental/LES |
@@ -1082,6 +1225,13 @@ coupling_convergence:
 | 19 | **3D Thermo-Elasticity + Turb** | NS (k-ω SST/LES) + Heat + Elasticity | Full 3D multi-physics |
 | 20 | **Hypersonic 6-DOF** | Reacting NS + 6-DOF + Ablation | Full vehicle |
 
+### Hosted Challenges
+
+| Tier | Capability |
+|------|------------|
+| **Tier 4** | **Full weapon-system surrogates** — 3D + turbulence + coupling + 6-DOF |
+| **Tier 4** | **Hypersonic vehicle** — Reacting flow + ablation + 6-DOF |
+
 ### What This Phase Means for Carbon
 - **Production-grade surrogates** — 3D turbulence + coupling gates passing, validated vs flight data
 - **Transfer learning pipeline proven** — 2D specialists → 3D → turbulence → coupled
@@ -1089,17 +1239,21 @@ coupling_convergence:
 - **Digital twin operational** — Continuous re-verification via Registry + Gas
 - **$10M+ ARR** — Production contracts with primes, platform partnerships (Dyad/Ansys/nTop)
 
+**Exit Criteria**: 4 3D turbulence benchmarks live with gates passing, 2+ Tier 4 production contracts ($2M+ ARR), $10M+ ARR run rate, platform partnerships (Dyad/Ansys/nTop).
+
 ---
 
 ## Phase Summary: What Each Jump Means for Carbon
 
 | Jump | Trigger | Carbon Capability Unlocked | Revenue Impact |
 |------|---------|---------------------------|----------------|
-| **0 → 1** | Validators live + 7 PDEs mesh-converged | **Trustless verification layer live** | Model Zoo (Tier 1) |
-| **1 → 2** | Factory + 6 defense benchmarks (turb UQ) + MT bridge | **Custom challenges + Structured losses** | Tier 2/3 + MT premium |
-| **2 → 3** | DML + Specialist Bank + Air-gapped Toolkit | **Causal intelligence + Deep custom + Air-gap** | Tier 4 + LoRA premium |
-| **3 → 4** | preCICE verified + 3 multi-physics benchmarks | **Coupled physics supply chain** | SBIR II + Tier 4 composite |
-| **4 → 5** | 3D turbulence gates + Curriculum proven | **Production-grade 3D turbulence** | $10M+ ARR / Production |
+| **0 → 1A** | Validators live + 7 PDEs mesh-converged | **Trustless verification layer live** | Model Zoo (Tier 1) |
+| **1A → 1B** | 2 defense benchmarks + Factory v1 + Tier 2 LOI | **Compressible flow verified + Factory revenue** | Tier 2 + Factory |
+| **1B → 2A** | 4 defense benchmarks + Factory hardened + Prime + SBIR I | **Defense breadth + Factory hardened + SBIR pipeline** | Tier 3 + SBIR I |
+| **2A → 2B** | LoRA + MT + DML + Specialist Bank + Commercial traction | **Deep customization + Causal intelligence** | LoRA/MT premium |
+| **2B → 3** | Air-Gap live + preCICE sidecar tested + Sequential ladder | **Classified-ready + Coupling architected** | Tier 4 + Coupling |
+| **3 → 4** | preCICE verified + 3 coupled benchmarks + SBIR II | **Coupled physics supply chain** | SBIR II + Tier 4 composite |
+| **4 → 5** | 3D turbulence gates + Curriculum proven + Production deals | **Production-grade 3D turbulence** | $10M+ ARR / Production |
 
 ---
 
@@ -1107,8 +1261,8 @@ coupling_convergence:
 
 | Version | Phase | Key Addition | Backward Compatible |
 |---------|-------|--------------|---------------------|
-| **v1.0** | Phase 0-1 | Frozen core (backbone, training, loss, curriculum, data) | — |
-| **v1.1** | Phase 2 | + `lora`, `custom_dataset`, `structured_losses` | ✅ (optional fields) |
+| **v1.0** | Phase 0-1B | Frozen core (backbone, training, loss, curriculum, data) | — |
+| **v1.1** | Phase 2A-2B | + `lora`, `custom_dataset`, `structured_losses` | ✅ (optional fields) |
 | **v2.0** | Phase 3 | `composite=true`, `sub_strategies`, `coupling`, `coupling_gates` | ❌ (new schema) |
 | **v2.0+** | Phase 4 | + `curriculum.phases`, `turbulence_gates`, `3d_gates` | ✅ (additive) |
 
@@ -1120,29 +1274,42 @@ coupling_convergence:
 |-----------|-----------------|-------------------|
 | **Definition** | Carbon-defined benchmarks | Sponsor-defined custom challenges |
 | **Purpose** | Subnet benchmarking, Model Zoo | Customer-specific surrogates |
-| **Count** | Fixed per phase (7→13→13→16→20) | Unlimited (Factory) |
+| **Count** | Fixed per phase (7→9→13→13→16→20) | Unlimited (Factory) |
 | **Geometry** | Standard (NACA, CRM, etc.) | Sponsor-provided (STL/STEP/proc) |
 | **BCs/Envelope** | Fixed ranges | Sponsor-defined |
 | **IP Ownership** | Carbon (public) | Tier 2: Carbon (embargo) / Tier 3: Sponsor / Tier 4: Sponsor |
-| **Revenue** | Indirect (Model Zoo) | Direct (Tier 2: $150-300k, T3: $400-800k, T4: $800k-2M+) |
+| **Revenue** | Indirect (Model Zoo) | Direct (T2: $150-300k, T3: $400-800k, T4: $800k-2M+) |
 | **Schema** | v1.0 → v1.1 → v2.0 → v2.0+ | Same as base for that phase |
 
 ---
 
-## Phase Timeline Summary
+## Phase Timeline Summary (Capability-Gated)
 
-| Phase | Months | Key Deliverable | Revenue |
-|-------|--------|-----------------|---------|
+| Phase | Est. Months | Key Deliverable | Revenue |
+|-------|-------------|-----------------|---------|
 | **0** | 0-4 | Subnet live, 7 PDEs mesh-converged, Model Zoo v1 | Tier 1 ($30k) |
-| **1** | 4-12 | 6 defense benchmarks (turb UQ), Factory, MT bridge | Tier 1-3 ($1.8M) |
-| **2** | 12-24 | v1.1, LoRA, Custom Data, DML, Air-gap | Tier 1-3 + LoRA ($6.5M) |
-| **3** | 24-36 | v2.0 Composite, preCICE, SBIR II | Tier 4 + SBIR ($16M) |
-| **4** | 36+ | 3D Turbulence, Curriculum, Production | $10M+ ARR |
+| **1A** | 4-8 | 2 defense benchmarks, Factory v1, Tier 2 LOI | Tier 1-2 ($150k) |
+| **1B** | 8-14 | 4 defense benchmarks, Factory hardened, Prime + SBIR I | Tier 1-3 ($500k) |
+| **2A** | 14-22 | v1.1, LoRA, Custom Data, MT, DML, Commercial traction | Tier 1-3 + LoRA ($1.5M) |
+| **2B** | 22-28 | Air-Gap live, preCICE architected, Sequential ladder | Tier 4 Pilot ($500k) |
+| **3** | 28-40 | v2.0 Composite, preCICE verified, SBIR II | Tier 4 + SBIR II ($5M) |
+| **4** | 40-52 | 3D Turbulence, Curriculum, Production contracts | $10M+ ARR |
 
 ---
 
-**This is the complete, rigorous phase specification. Every jump is capability-gated, every schema change is documented, every physics rigor requirement is specified, every implementation constraint is addressed.**
+## Phase Gate Template (Applied to Every Transition)
 
+| Gate Category | Required Metrics |
+|---------------|------------------|
+| **Physics Rigor** | Mesh convergence ✓, Turbulence/Chemistry UQ ✓, Gate calibration ✓, Coupling convergence (Ph 3+) ✓ |
+| **Validator Health** | Uptime > 99%, Miner participation > 20, Challenge throughput > 50/week, Multi-GPU stability (Ph 2B+) |
+| **Economics** | α/TAO floor validated, Validator ROI > 0 at floor, Emission efficiency > 80% |
+| **Revenue** | Tier 1 ARR target, Tier 2/3 LOIs, Tier 4 pilots, SBIR milestones |
+| **Network** | Miner count > 20 (Ph 1+), Strategy throughput > 100/week, Gate pass rate > 15% |
+
+---
+
+**This is the complete, rigorous, capability-gated phase specification. Every jump has explicit physics rigor requirements, validator health gates, revenue milestones, and schema evolution documented. Physics complexity grows incrementally (Academic → Compressible → Reacting/Sequential FSI → Customization → Air-Gap/Sequential Multi-Physics → Full Coupling → 3D Turbulence). Revenue grows with capability. Validators prove economics at each step.**
 ## Validation Strategy — Scientific Rigor & Competitive Edge
 
 Multi-objective scoring (45/30/25), hard/soft physics gates, and hidden stress testing. The Trustless Verification and Data Generation System (see dedicated document) ensures that both stress and benchmark data are generated in a publicly seeded, auditable, and scientifically credible manner.
